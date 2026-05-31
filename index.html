@@ -445,6 +445,12 @@
         <div class="hint">Use the same key on every device to share one global test counter</div>
       </div>
 
+      <div class="field">
+        <label>Site Verify Webhook (Optional)</label>
+        <input type="url" id="verifyEndpointInput" placeholder="https://sitjd.vercel.app/api/test-hit" />
+        <div class="hint">Called once per test hit so your own backend can verify and count it</div>
+      </div>
+
       <!-- Status bar -->
       <div class="status-wrap">
         <div class="status-label">
@@ -484,6 +490,7 @@
   const delayInput = document.getElementById('delayInput');
   const realInput  = document.getElementById('realInput');
   const counterKeyInput = document.getElementById('counterKeyInput');
+  const verifyEndpointInput = document.getElementById('verifyEndpointInput');
   const realTabBtn = document.getElementById('realTabBtn');
   const testTabBtn = document.getElementById('testTabBtn');
   const realTabView = document.getElementById('realTabView');
@@ -504,7 +511,7 @@
   let logLines = 0;
   const STATS_KEY = 'chroniumx.visitStats.v1';
   const GLOBAL_NAMESPACE = 'chroniumx';
-  let visitStats = { real: 0, counterKey: 'sitjd-vercel-app' };
+  let visitStats = { real: 0, counterKey: 'sitjd-vercel-app', verifyEndpoint: '' };
   let globalBotCount = 0;
 
   /* ── Helpers ─────────────────────────────── */
@@ -582,8 +589,11 @@
       if (typeof parsed.counterKey === 'string' && parsed.counterKey.trim()) {
         visitStats.counterKey = parsed.counterKey.trim();
       }
+      if (typeof parsed.verifyEndpoint === 'string') {
+        visitStats.verifyEndpoint = parsed.verifyEndpoint.trim();
+      }
     } catch {
-      visitStats = { real: 0, counterKey: 'sitjd-vercel-app' };
+      visitStats = { real: 0, counterKey: 'sitjd-vercel-app', verifyEndpoint: '' };
     }
   }
 
@@ -598,6 +608,7 @@
     totalCountEl.textContent = String(total);
     realInput.value = String(visitStats.real);
     counterKeyInput.value = visitStats.counterKey;
+    verifyEndpointInput.value = visitStats.verifyEndpoint;
   }
 
   function safeCounterKey() {
@@ -660,6 +671,34 @@
     }
   }
 
+  async function notifyVerifyEndpoint(targetUrl, status, index) {
+    const endpoint = (visitStats.verifyEndpoint || '').trim();
+    if (!endpoint) return;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          source: 'chroniumx',
+          targetUrl,
+          status,
+          index,
+          counterKey: safeCounterKey(),
+          timestamp: new Date().toISOString(),
+        }),
+        cache: 'no-store',
+        keepalive: true,
+      });
+      if (res.ok) {
+        log(`Verify webhook accepted hit ${index}.`, 'success');
+      } else {
+        log(`Verify webhook returned ${res.status} on hit ${index}.`, 'warn');
+      }
+    } catch {
+      log(`Verify webhook request failed on hit ${index}.`, 'warn');
+    }
+  }
+
   /* ── Hidden iframe container ───────────────── */
   const iframeBox = document.createElement('div');
   iframeBox.style.cssText = 'position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;top:-9999px;left:-9999px;';
@@ -680,6 +719,7 @@
         settled = true;
         const ms = Math.round(performance.now() - start);
         await incrementGlobalCounter();
+        await notifyVerifyEndpoint(url, status, index);
         if (status === 'ok') {
           log(`Test visit ${index} loaded  (${ms} ms)`, 'success');
         } else {
@@ -796,6 +836,18 @@
     renderStats();
     log(`Global counter key set to "${safeCounterKey()}".`, 'num');
     syncGlobalCounter();
+  });
+
+  verifyEndpointInput.addEventListener('change', () => {
+    const value = (verifyEndpointInput.value || '').trim();
+    visitStats.verifyEndpoint = value;
+    saveStats();
+    renderStats();
+    if (value) {
+      log('Site verify webhook saved.', 'num');
+    } else {
+      log('Site verify webhook cleared.', 'warn');
+    }
   });
 
   /* clamp inputs live */
