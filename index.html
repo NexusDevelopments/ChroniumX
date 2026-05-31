@@ -114,7 +114,8 @@
       text-transform: uppercase;
     }
     input[type="url"],
-    input[type="number"] {
+    input[type="number"],
+    input[type="text"] {
       background: #0d0d0d;
       border: 1px solid var(--border);
       color: var(--text);
@@ -127,7 +128,8 @@
       width: 100%;
     }
     input[type="url"]:focus,
-    input[type="number"]:focus {
+    input[type="number"]:focus,
+    input[type="text"]:focus {
       border-color: var(--border2);
     }
     input::placeholder { color: var(--muted); }
@@ -143,6 +145,43 @@
       font-size: .62rem;
       color: var(--muted);
       margin-top: 2px;
+    }
+
+    /* ── Tabs ───────────────────────────────── */
+    .tab-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .tab-btn {
+      background: #101010;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-size: .68rem;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .tab-btn.active {
+      background: #f0f0f0;
+      color: #101010;
+      border-color: #f0f0f0;
+      font-weight: 700;
+    }
+    .tab-view {
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #111;
+      padding: 16px;
+    }
+    .tab-view.active {
+      display: flex;
     }
 
     /* ── Status bar ──────────────────────────── */
@@ -319,6 +358,9 @@
       .counter-grid {
         grid-template-columns: 1fr;
       }
+      .tab-strip {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -334,6 +376,44 @@
   <div class="panel">
     <div class="panel-title">Configuration</div>
     <div class="form-body">
+
+      <div class="tab-strip">
+        <button class="tab-btn active" id="realTabBtn" type="button">Real Traffic</button>
+        <button class="tab-btn" id="testTabBtn" type="button">Test Traffic</button>
+      </div>
+
+      <div class="tab-view active" id="realTabView">
+        <div class="field">
+          <label>Real Visits Baseline</label>
+          <input type="number" id="realInput" min="0" value="0" />
+          <div class="hint">Set this to your current analytics value for human visits</div>
+        </div>
+
+        <div class="counter-grid">
+          <div class="counter-card">
+            <div class="counter-label">Real Visits</div>
+            <div class="counter-value" id="realCount">0</div>
+          </div>
+          <div class="counter-card">
+            <div class="counter-label">Global Test/Bot Visits</div>
+            <div class="counter-value" id="botCount">0</div>
+          </div>
+          <div class="counter-card">
+            <div class="counter-label">Total Visits</div>
+            <div class="counter-value" id="totalCount">0</div>
+          </div>
+        </div>
+
+        <div class="notice">
+          Real and test traffic are separated. Total combines both for visibility only.
+        </div>
+
+        <div class="btn-row">
+          <button id="resetStatsBtn">Reset Counters</button>
+        </div>
+      </div>
+
+      <div class="tab-view" id="testTabView">
 
       <div class="field">
         <label>Target URL</label>
@@ -375,29 +455,11 @@
         </div>
       </div>
 
-      <div class="counter-grid">
-        <div class="counter-card">
-          <div class="counter-label">Real Visits</div>
-          <div class="counter-value" id="realCount">0</div>
-        </div>
-        <div class="counter-card">
-          <div class="counter-label">Global Test/Bot Visits</div>
-          <div class="counter-value" id="botCount">0</div>
-        </div>
-        <div class="counter-card">
-          <div class="counter-label">Total Visits</div>
-          <div class="counter-value" id="totalCount">0</div>
-        </div>
-      </div>
-
-      <div class="notice">
-        Test/Bot visits are tracked separately. They are not treated as verified human traffic.
-      </div>
-
       <div class="btn-row">
         <button id="startBtn">&#9654;&nbsp; Start</button>
         <button id="clearBtn">Clear Console</button>
-        <button id="resetStatsBtn">Reset Counters</button>
+      </div>
+
       </div>
 
     </div>
@@ -422,6 +484,10 @@
   const delayInput = document.getElementById('delayInput');
   const realInput  = document.getElementById('realInput');
   const counterKeyInput = document.getElementById('counterKeyInput');
+  const realTabBtn = document.getElementById('realTabBtn');
+  const testTabBtn = document.getElementById('testTabBtn');
+  const realTabView = document.getElementById('realTabView');
+  const testTabView = document.getElementById('testTabView');
   const startBtn   = document.getElementById('startBtn');
   const clearBtn   = document.getElementById('clearBtn');
   const resetStatsBtn = document.getElementById('resetStatsBtn');
@@ -495,6 +561,14 @@
 
   function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
+  }
+
+  function setTab(tabName) {
+    const showReal = tabName === 'real';
+    realTabBtn.classList.toggle('active', showReal);
+    testTabBtn.classList.toggle('active', !showReal);
+    realTabView.classList.toggle('active', showReal);
+    testTabView.classList.toggle('active', !showReal);
   }
 
   function loadStats() {
@@ -684,6 +758,9 @@
   }
 
   /* ── Events ──────────────────────────────── */
+  realTabBtn.addEventListener('click', () => setTab('real'));
+  testTabBtn.addEventListener('click', () => setTab('test'));
+
   startBtn.addEventListener('click', () => {
     if (!running) run();
   });
@@ -730,6 +807,7 @@
 
   loadStats();
   renderStats();
+  setTab('real');
   syncGlobalCounter();
 </script>
 </body>
