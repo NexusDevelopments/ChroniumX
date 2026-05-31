@@ -1207,7 +1207,7 @@
         <div class="field">
           <label>Asset Scope</label>
           <label class="notice" style="display:flex;align-items:center;gap:8px;border-left:0;padding-left:0;margin-top:8px;">
-            <input type="checkbox" id="sameOriginAssetsInput" checked />
+            <input type="checkbox" id="sameOriginAssetsInput" />
             Same-origin assets only
           </label>
           <label class="notice" style="display:flex;align-items:center;gap:8px;border-left:0;padding-left:0;margin-top:8px;">
@@ -1375,6 +1375,7 @@
         <div class="updates-item">Added live crawl progress updates during scrape.</div>
         <div class="updates-item">Moved Live Preview into its own dedicated tab with empty-state handling when no code is scraped.</div>
         <div class="updates-item">Added JavaScript render mode option for stronger scraping on modern JS-heavy websites.</div>
+        <div class="updates-item">Added aggressive scraping profile for Discord/Instagram/TikTok with external asset crawling and JS-shell fallback rendering.</div>
       </div>
     </div>
   </div>
@@ -1476,7 +1477,7 @@
 
   let running = false;
   let logLines = 0;
-  const APP_VERSION = 'v.2.6.0';
+  const APP_VERSION = 'v.2.7.0';
   const PREFS_KEY = 'chroniumx.scraperPrefs.v1';
   let currentStorageKey = 'sourcevault.scrapes.v1';
   let wizardStep = 1;
@@ -2590,7 +2591,22 @@
     log(`Max pages   : ${maxPages}`, 'num');
     log(`Max assets  : ${maxAssets}`, 'num');
     log(`Max depth   : ${maxDepth}`, 'num');
-    log(`Same-origin : ${sameOriginAssetsInput.checked ? 'assets only' : 'all assets'}`, 'num');
+    const hostname = new URL(url).hostname;
+    const isKnownJsHeavy = /(^|\.)discord\.|(^|\.)instagram\.|(^|\.)tiktok\./i.test(hostname);
+    const effectiveSameOriginAssetsOnly = isKnownJsHeavy ? false : sameOriginAssetsInput.checked;
+    if (isKnownJsHeavy) {
+      log('Aggressive profile active for JS-heavy target.', 'warn');
+      if (maxAssets < 200) {
+        maxAssets = 200;
+        delayInput.value = '200';
+      }
+      if (maxPages < 8) {
+        maxPages = 8;
+        countInput.value = '8';
+      }
+    }
+
+    log(`Same-origin : ${effectiveSameOriginAssetsOnly ? 'assets only' : 'all assets'}`, 'num');
     log(`JS render   : ${jsRenderInput.checked ? 'enabled' : 'disabled'}`, 'num');
     log('No bot traffic will be sent.', 'success');
 
@@ -2603,7 +2619,7 @@
           maxPages,
           maxAssets,
           maxDepth,
-          sameOriginAssetsOnly: sameOriginAssetsInput.checked,
+          sameOriginAssetsOnly: effectiveSameOriginAssetsOnly,
           renderJs: jsRenderInput.checked,
         }),
       });
@@ -2630,6 +2646,9 @@
               assetsProcessed: 0,
             });
             log(`Crawl started for ${event.slug}.`, 'dim');
+            if (event.aggressiveProfile) {
+              log('Aggressive scrape profile enabled by backend.', 'warn');
+            }
             return;
           }
 
