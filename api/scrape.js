@@ -1,5 +1,5 @@
 const MAX_PAGES = 25;
-const MAX_ASSETS = 250;
+const MAX_ASSETS = 1000;
 const MAX_FILE_CHARS = 200_000;
 const MAX_RENDER_SNAPSHOT_CHARS = 160_000;
 const MAX_TOTAL_CHARS = 2_000_000;
@@ -65,6 +65,43 @@ function detectType(pathname) {
   if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
   if (lower.endsWith(".css")) return "css";
   if (lower.endsWith(".js") || lower.endsWith(".mjs") || lower.endsWith(".cjs")) return "js";
+  return "text";
+}
+
+function extractInlineStyles(html) {
+  const styles = [];
+  const re = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+  let match;
+  while ((match = re.exec(String(html || ""))) !== null) {
+    const css = String(match[1] || "").trim();
+    if (css) styles.push(css);
+  }
+  return styles;
+}
+
+function makeInlineCssPath(pagePath, index, suffix = "") {
+  const base = String(pagePath || "index.html").replace(/\//g, "_").replace(/\.html?$/i, "") || "page";
+  return `inline-css/${base}${suffix}-style-${index + 1}.css`;
+}
+
+function inferAssetType(assetPath, contentType, text) {
+  const pathType = detectType(assetPath);
+  if (pathType === "css" || pathType === "js") return pathType;
+
+  const ct = String(contentType || "").toLowerCase();
+  if (ct.includes("text/css")) return "css";
+  if (ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("application/x-javascript")) return "js";
+
+  const body = String(text || "").trim();
+  if (!body) return "text";
+
+  if (/@(?:import|media|font-face|supports|keyframes)\b/.test(body) || /\{[^{}]{0,200}:[^{}]{0,200};/.test(body)) {
+    return "css";
+  }
+  if (/\b(function|const|let|var|import|export|class)\b/.test(body) || /=>|webpackChunk/.test(body)) {
+    return "js";
+  }
+
   return "text";
 }
 
@@ -491,7 +528,44 @@ module.exports = async function handler(req, res) {
         warnings
       );
 
-      const { pageLinks, assetLinks } = extractLinks(text, currentUrl);
+      const primaryLinks = extractLinks(text, currentUrl);
+      const renderedLinks = rendered && typeof pageResult.renderedText === "string"
+        ? extractLinks(pageResult.renderedText, currentUrl)
+        : { pageLinks: [], assetLinks: [] };
+      const pageLinks = Array.from(new Set([...(primaryLinks.pageLinks || []), ...(renderedLinks.pageLinks || [])]));
+      const assetLinks = Array.from(new Set([...(primaryLinks.assetLinks || []), ...(renderedLinks.assetLinks || [])]));
+
+      const inlineStyles = extractInlineStyles(text);
+      inlineStyles.forEach((css, idx) => {
+        pushFile(
+          filesMap,
+          {
+            path: makeInlineCssPath(pagePath, idx),
+            type: "css",
+            sourceUrl: `${currentUrl}#inline-style-${idx + 1}`,
+            content: css,
+          },
+          counters,
+          warnings
+        );
+      });
+
+      if (rendered && typeof pageResult.renderedText === "string") {
+        const renderedInlineStyles = extractInlineStyles(pageResult.renderedText);
+        renderedInlineStyles.forEach((css, idx) => {
+          pushFile(
+            filesMap,
+            {
+              path: makeInlineCssPath(pagePath, idx, "-rendered"),
+              type: "css",
+              sourceUrl: `${currentUrl}#rendered-inline-style-${idx + 1}`,
+              content: css,
+            },
+            counters,
+            warnings
+          );
+        });
+      }
 
       for (const pageLink of pageLinks) {
         try {
@@ -577,38 +651,22 @@ module.exports = async function handler(req, res) {
     }
 
     const assetPath = makeAssetPath(obj, sourceOrigin);
-    const guessedType = detectType(assetPath);
-    if (!(guessedType === "css" || guessedType === "js")) {
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        saved: false,
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
-      continue;
-    }
 
     try {
       const { text, contentType } = await fetchText(assetUrl);
       const lowerContentType = contentType.toLowerCase();
 
-      if (
-        guessedType === "css" &&
-        !lowerContentType.includes("css") &&
-        !assetPath.toLowerCase().endsWith(".css")
-      ) {
-        continue;
-      }
-
-      if (
-        guessedType === "js" &&
-        !lowerContentType.includes("javascript") &&
-        !lowerContentType.includes("ecmascript") &&
-        !assetPath.toLowerCase().endsWith(".js")
-      ) {
+      const inferredType = inferAssetType(assetPath, lowerContentType, text);
+      if (!(inferredType === "css" || inferredType === "js")) {
+        sendEvent({
+          type: "asset",
+          url: assetUrl,
+          saved: false,
+          assetsProcessed: processedAssets,
+          assetLimit,
+          pagesVisited: visitedPages.size,
+          pageLimit,
+        });
         continue;
       }
 
@@ -616,7 +674,7 @@ module.exports = async function handler(req, res) {
         filesMap,
         {
           path: assetPath,
-          type: guessedType,
+          type: inferredType,
           sourceUrl: assetUrl,
           content: text,
         },

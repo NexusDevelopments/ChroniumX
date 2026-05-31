@@ -1242,8 +1242,8 @@
         </div>
         <div class="field">
           <label>Max Assets (CSS/JS)</label>
-          <input type="number" id="delayInput" min="1" max="250" value="80" />
-          <div class="hint">Min: 1 &nbsp;|&nbsp; Max: 250</div>
+          <input type="number" id="delayInput" min="1" max="1000" value="180" />
+          <div class="hint">Min: 1 &nbsp;|&nbsp; Max: 1000</div>
         </div>
       </div>
 
@@ -1447,6 +1447,8 @@
         <div class="updates-item">Added JavaScript render mode option for stronger scraping on modern JS-heavy websites.</div>
         <div class="updates-item">Added aggressive scraping profile for Discord/Instagram/TikTok with external asset crawling and JS-shell fallback rendering.</div>
         <div class="updates-item">Added Renderer Health panel, Scrape Quality report, and rendered snapshot preview mode controls.</div>
+        <div class="updates-item">Boosted CSS scraping for JS-heavy sites with rendered-page link extraction, inline style capture, and content-based CSS detection.</div>
+        <div class="updates-item">Target URL now auto-configures crawl settings (pages/assets/depth/render profile) based on detected site type.</div>
       </div>
     </div>
   </div>
@@ -1560,7 +1562,7 @@
 
   let running = false;
   let logLines = 0;
-  const APP_VERSION = 'v.2.8.0';
+  const APP_VERSION = 'v.3.0.0';
   const PREFS_KEY = 'chroniumx.scraperPrefs.v1';
   let currentStorageKey = 'sourcevault.scrapes.v1';
   let wizardStep = 1;
@@ -1572,6 +1574,7 @@
     liveProgress: null,
     searchTerm: '',
     previewMode: 'rendered',
+    lastAutoProfileHost: null,
   };
   let pageLoadTimer = null;
   let pageLoadToken = 0;
@@ -1770,6 +1773,83 @@
       }
     }
     return true;
+  }
+
+  function detectAutoScrapeProfile(hostname) {
+    const host = String(hostname || '').toLowerCase();
+
+    if (/(^|\.)discord\.|(^|\.)instagram\.|(^|\.)tiktok\.|(^|\.)x\.com$|(^|\.)twitter\.com$|(^|\.)facebook\.com$|(^|\.)reddit\./.test(host)) {
+      return {
+        name: 'JS-Heavy Social',
+        pages: 12,
+        assets: 900,
+        depth: 5,
+        sameOriginAssetsOnly: false,
+        jsRender: true,
+      };
+    }
+
+    if (/(^|\.)wikipedia\.|(^|\.)developer\.mozilla\.|(^|\.)docs\.|(^|\.)readthedocs\.|(^|\.)github\.io$/.test(host)) {
+      return {
+        name: 'Documentation / Static',
+        pages: 14,
+        assets: 260,
+        depth: 4,
+        sameOriginAssetsOnly: true,
+        jsRender: false,
+      };
+    }
+
+    if (/(^|\.)shopify\.com$|(^|\.)etsy\.|(^|\.)amazon\.|(^|\.)ebay\./.test(host)) {
+      return {
+        name: 'Commerce',
+        pages: 10,
+        assets: 700,
+        depth: 4,
+        sameOriginAssetsOnly: false,
+        jsRender: true,
+      };
+    }
+
+    return {
+      name: 'Balanced',
+      pages: 10,
+      assets: 420,
+      depth: 4,
+      sameOriginAssetsOnly: false,
+      jsRender: true,
+    };
+  }
+
+  function applyAutoScrapeSettings(options = {}) {
+    const { silent = false, force = false } = options;
+    const raw = (urlInput.value || '').trim();
+    if (!raw) return;
+
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      return;
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    if (!force && state.lastAutoProfileHost === host) {
+      return;
+    }
+
+    const profile = detectAutoScrapeProfile(host);
+    countInput.value = String(Math.max(1, Math.min(25, Number(profile.pages) || 10)));
+    delayInput.value = String(Math.max(1, Math.min(1000, Number(profile.assets) || 420)));
+    depthInput.value = String(Math.max(1, Math.min(10, Number(profile.depth) || 4)));
+    sameOriginAssetsInput.checked = !!profile.sameOriginAssetsOnly;
+    jsRenderInput.checked = !!profile.jsRender;
+    state.lastAutoProfileHost = host;
+    savePrefs();
+
+    if (!silent) {
+      log(`Auto settings applied (${profile.name}) for ${host}.`, 'success');
+    }
   }
 
   function timestamp() {
@@ -2708,6 +2788,11 @@
       return;
     }
 
+    applyAutoScrapeSettings({ silent: true, force: true });
+    maxPages = parseInt(countInput.value, 10);
+    maxAssets = parseInt(delayInput.value, 10);
+    maxDepth = parseInt(depthInput.value, 10);
+
     if (Number.isNaN(maxPages) || maxPages < 1) {
       maxPages = 1;
       countInput.value = '1';
@@ -2720,9 +2805,9 @@
       maxAssets = 1;
       delayInput.value = '1';
     }
-    if (maxAssets > 250) {
-      maxAssets = 250;
-      delayInput.value = '250';
+    if (maxAssets > 1000) {
+      maxAssets = 1000;
+      delayInput.value = '1000';
     }
     if (Number.isNaN(maxDepth) || maxDepth < 1) {
       maxDepth = 1;
@@ -2749,9 +2834,9 @@
     const effectiveSameOriginAssetsOnly = isKnownJsHeavy ? false : sameOriginAssetsInput.checked;
     if (isKnownJsHeavy) {
       log('Aggressive profile active for JS-heavy target.', 'warn');
-      if (maxAssets < 200) {
-        maxAssets = 200;
-        delayInput.value = '200';
+      if (maxAssets < 600) {
+        maxAssets = 600;
+        delayInput.value = '600';
       }
       if (maxPages < 8) {
         maxPages = 8;
@@ -3039,6 +3124,14 @@
   realInput.addEventListener('change', savePrefs);
   verifyEndpointInput.addEventListener('change', savePrefs);
 
+  urlInput.addEventListener('change', () => {
+    applyAutoScrapeSettings();
+  });
+
+  urlInput.addEventListener('blur', () => {
+    applyAutoScrapeSettings();
+  });
+
   countInput.addEventListener('change', () => {
     let v = parseInt(countInput.value, 10);
     if (v < 1) countInput.value = '1';
@@ -3048,7 +3141,7 @@
   delayInput.addEventListener('change', () => {
     let v = parseInt(delayInput.value, 10);
     if (v < 1) delayInput.value = '1';
-    if (v > 250) delayInput.value = '250';
+    if (v > 1000) delayInput.value = '1000';
   });
 
   window.addEventListener('popstate', applyRoute);
