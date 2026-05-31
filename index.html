@@ -108,6 +108,12 @@
       min-width: 110px;
     }
 
+    .mini-btn.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: #1a1a1a;
+    }
+
     .app-page {
       width: 100%;
       max-width: 760px;
@@ -162,6 +168,30 @@
       to {
         transform: rotate(360deg);
       }
+    }
+
+    .viewer-toolbar {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .preview-status {
+      margin-left: auto;
+      font-size: .62rem;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
     }
 
     .panel-title {
@@ -884,6 +914,11 @@
         width: 100%;
       }
 
+      .preview-status {
+        width: 100%;
+        margin-left: 0;
+      }
+
       input[type="url"],
       input[type="number"],
       input[type="text"],
@@ -1082,7 +1117,13 @@
       <div id="fileList" style="width:38%;min-width:220px;border-right:1px solid var(--border);padding:10px;overflow:auto;"></div>
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
         <div id="sourceMeta" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:.68rem;color:var(--muted);word-break:break-all;">Source URL: -</div>
+        <div class="viewer-toolbar">
+          <button id="viewSourceBtn" class="mini-btn active" type="button">Source</button>
+          <button id="viewPreviewBtn" class="mini-btn" type="button">Live Preview</button>
+          <span class="preview-status" id="previewStatus">Preview ready</span>
+        </div>
         <pre id="sourceView" style="margin:0;padding:14px;font-size:.76rem;line-height:1.6;overflow:auto;flex:1;color:var(--c-info);background:#101010;">Select a scraped file to view its source.</pre>
+        <iframe id="livePreview" class="preview-frame" title="Live preview" hidden></iframe>
       </div>
     </div>
   </div>
@@ -1105,6 +1146,7 @@
         <div class="updates-item">Improved mobile layout and stacked file manager for smaller screens.</div>
         <div class="updates-item">Added folder tree grouping plus per-file/folder/site export options.</div>
         <div class="updates-item">Added live crawl progress updates during scrape.</div>
+        <div class="updates-item">Added Live Preview mode in File Manager to render scraped HTML pages.</div>
       </div>
     </div>
   </div>
@@ -1186,6 +1228,10 @@
   const totalCountEl = document.getElementById('totalCount');
   const fileListEl = document.getElementById('fileList');
   const sourceViewEl = document.getElementById('sourceView');
+  const viewSourceBtn = document.getElementById('viewSourceBtn');
+  const viewPreviewBtn = document.getElementById('viewPreviewBtn');
+  const previewStatusEl = document.getElementById('previewStatus');
+  const livePreviewEl = document.getElementById('livePreview');
   const sourceMetaEl = document.getElementById('sourceMeta');
   const activeRouteEl = document.getElementById('activeRoute');
   const confirmModalBackdrop = document.getElementById('confirmModalBackdrop');
@@ -1195,7 +1241,7 @@
 
   let running = false;
   let logLines = 0;
-  const APP_VERSION = 'v.2.3.0';
+  const APP_VERSION = 'v.2.4.0';
   const PREFS_KEY = 'chroniumx.scraperPrefs.v1';
   let currentStorageKey = 'sourcevault.scrapes.v1';
   let wizardStep = 1;
@@ -1206,9 +1252,12 @@
     selectedFiles: new Set(),
     liveProgress: null,
     searchTerm: '',
+    viewMode: 'source',
   };
   let pageLoadTimer = null;
   let pageLoadToken = 0;
+  let previewBlobUrl = null;
+  let previewAssetUrls = [];
 
   const tagMap = {
     info: '[INFO]',
@@ -1572,6 +1621,140 @@
     return scrape && scrape.files ? scrape.files : {};
   }
 
+  function clearLivePreviewResources() {
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      previewBlobUrl = null;
+    }
+    if (previewAssetUrls.length) {
+      previewAssetUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewAssetUrls = [];
+    }
+  }
+
+  function setPreviewStatus(message) {
+    previewStatusEl.textContent = message;
+  }
+
+  function setViewerMode(mode) {
+    state.viewMode = mode === 'preview' ? 'preview' : 'source';
+    const showPreview = state.viewMode === 'preview';
+
+    viewSourceBtn.classList.toggle('active', !showPreview);
+    viewPreviewBtn.classList.toggle('active', showPreview);
+    sourceViewEl.hidden = showPreview;
+    livePreviewEl.hidden = !showPreview;
+  }
+
+  function normalizeFilePath(path) {
+    const parts = String(path || '').split('/');
+    const stack = [];
+    for (const part of parts) {
+      if (!part || part === '.') continue;
+      if (part === '..') {
+        if (stack.length) stack.pop();
+        continue;
+      }
+      stack.push(part);
+    }
+    return stack.join('/');
+  }
+
+  function resolveRelativeFilePath(currentPath, rawRef) {
+    const ref = String(rawRef || '').trim();
+    if (!ref) return null;
+    if (/^(?:[a-z]+:|\/\/|#|mailto:|tel:|data:|javascript:)/i.test(ref)) return null;
+
+    const [pathPart] = ref.split('#')[0].split('?');
+    if (!pathPart) return null;
+
+    if (pathPart.startsWith('/')) {
+      return normalizeFilePath(pathPart.slice(1));
+    }
+
+    const currentParts = String(currentPath || '').split('/').filter(Boolean);
+    if (currentParts.length) currentParts.pop();
+    const merged = [...currentParts, ...pathPart.split('/')].join('/');
+    return normalizeFilePath(merged);
+  }
+
+  function makeBlobUrlForFile(file) {
+    const type = String(file.type || '').toLowerCase();
+    const mime = type === 'html'
+      ? 'text/html;charset=utf-8'
+      : type === 'css'
+        ? 'text/css;charset=utf-8'
+        : type === 'js'
+          ? 'text/javascript;charset=utf-8'
+          : 'text/plain;charset=utf-8';
+    const blobUrl = URL.createObjectURL(new Blob([file.content || ''], { type: mime }));
+    previewAssetUrls.push(blobUrl);
+    return blobUrl;
+  }
+
+  function rewriteHtmlForPreview(file, filesByPath) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(file.content || '', 'text/html');
+    const attrTargets = [
+      ['link[href]', 'href'],
+      ['script[src]', 'src'],
+      ['img[src]', 'src'],
+      ['source[src]', 'src'],
+      ['video[src]', 'src'],
+      ['audio[src]', 'src'],
+      ['iframe[src]', 'src'],
+    ];
+
+    for (const [selector, attr] of attrTargets) {
+      doc.querySelectorAll(selector).forEach((el) => {
+        const original = el.getAttribute(attr);
+        if (!original) return;
+
+        const localPath = resolveRelativeFilePath(file.path, original);
+        if (!localPath || !filesByPath[localPath]) return;
+
+        const localFile = filesByPath[localPath];
+        const blobUrl = makeBlobUrlForFile(localFile);
+
+        const hashIndex = original.indexOf('#');
+        const queryIndex = original.indexOf('?');
+        const suffixIndex = [hashIndex, queryIndex].filter((n) => n >= 0).sort((a, b) => a - b)[0];
+        const suffix = suffixIndex >= 0 ? original.slice(suffixIndex) : '';
+
+        el.setAttribute(attr, `${blobUrl}${suffix}`);
+      });
+    }
+
+    return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  }
+
+  function renderPreviewMessage(message) {
+    livePreviewEl.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:monospace;background:#101010;color:#9e9e9e;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center;font-size:14px;line-height:1.6;} .box{border:1px solid #2a2a2a;background:#121212;padding:16px;border-radius:6px;max-width:520px;}</style></head><body><div class="box">${escapeHtml(message)}</div></body></html>`;
+  }
+
+  function renderLivePreview(file) {
+    clearLivePreviewResources();
+
+    if (!file) {
+      setPreviewStatus('Select a file to preview.');
+      renderPreviewMessage('Select a scraped file to view a live preview.');
+      return;
+    }
+
+    if (String(file.type || '').toLowerCase() !== 'html') {
+      setPreviewStatus('Live Preview is available for HTML files only.');
+      renderPreviewMessage('This file type cannot be rendered as a full page preview. Open an HTML file to use Live Preview.');
+      return;
+    }
+
+    const filesByPath = currentFilesByPath();
+    const html = rewriteHtmlForPreview(file, filesByPath);
+    previewBlobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    livePreviewEl.removeAttribute('srcdoc');
+    livePreviewEl.src = previewBlobUrl;
+    setPreviewStatus(`Previewing ${file.path}`);
+  }
+
   function buildFileTree(files) {
     const root = { folders: new Map(), files: [] };
 
@@ -1706,6 +1889,10 @@
       activeRouteEl.textContent = '/';
       sourceMetaEl.textContent = 'Source URL: -';
       sourceViewEl.textContent = 'Select a scraped file to view its source.';
+      clearLivePreviewResources();
+      livePreviewEl.removeAttribute('src');
+      renderPreviewMessage('Select a scraped site and HTML file to open Live Preview.');
+      setPreviewStatus('Preview ready');
       searchCountEl.textContent = '0 results';
       return;
     }
@@ -1734,11 +1921,20 @@
     if (!activeFile) {
       sourceMetaEl.textContent = 'Source URL: -';
       sourceViewEl.textContent = 'Pick a file from the list to view its content.';
+      clearLivePreviewResources();
+      livePreviewEl.removeAttribute('src');
+      renderPreviewMessage('Pick an HTML file to render it in Live Preview.');
+      setPreviewStatus('Preview ready');
       return;
     }
 
     sourceMetaEl.textContent = `Source URL: ${activeFile.sourceUrl || '-'}`;
     sourceViewEl.textContent = activeFile.content || '';
+    if (state.viewMode === 'preview') {
+      renderLivePreview(activeFile);
+    } else {
+      setPreviewStatus('Preview ready');
+    }
   }
 
   function renderTreeNode(node, container, pathParts) {
@@ -1868,7 +2064,13 @@
     state.activeSlug = null;
     state.activeFilePath = null;
     state.searchTerm = '';
+    state.viewMode = 'source';
     searchInput.value = '';
+    clearLivePreviewResources();
+    livePreviewEl.removeAttribute('src');
+    renderPreviewMessage('Select a scraped site and HTML file to open Live Preview.');
+    setViewerMode('source');
+    setPreviewStatus('Preview ready');
     resetSelections();
     setProgress(0, 0);
     switchPage('settings');
@@ -2262,6 +2464,17 @@
     log(`Downloaded manifest for ${scrape.slug}.`, 'success');
   });
 
+  viewSourceBtn.addEventListener('click', () => {
+    setViewerMode('source');
+    setPreviewStatus('Preview ready');
+  });
+
+  viewPreviewBtn.addEventListener('click', () => {
+    setViewerMode('preview');
+    const file = currentFile();
+    renderLivePreview(file);
+  });
+
   clearBtn.addEventListener('click', () => {
     clearConsoleOutput();
     clearCurrentViewOnly();
@@ -2395,6 +2608,9 @@
   currentStorageKey = safeStorageKey();
   state.scrapes = loadScrapes(currentStorageKey);
   updatesVersion.textContent = `Version: ${APP_VERSION}`;
+  setViewerMode('source');
+  renderPreviewMessage('Select a scraped site and HTML file to open Live Preview.');
+  setPreviewStatus('Preview ready');
   log('ChroniumX initialized in scraper mode.', 'dim');
   switchPage('settings', { withLoader: false });
   setWizardStep(1);
