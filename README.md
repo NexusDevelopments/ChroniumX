@@ -1,36 +1,22 @@
-# SourceVault Crawler
+# ChroniumX Website Source Scraper
 
-SourceVault Crawler turns this project into a website source scraper/crawler.
+ChroniumX is a focused website source scraper built to collect and organize front-end source files from a target site. It is designed for quick inspection, browsing, and export of captured site code.
 
-## What it does
+## What The Scraper Does
 
-- Scrapes a target site starting from one URL.
-- Captures source files for HTML pages, CSS files, and JS files.
-- Stores scraped results in browser local storage.
-- Provides a file manager with clickable files.
-- Uses route-style file viewing:
-	- `/{scraped-site-shortname}/{filename}`
-	- Example: `/example-com/index.html`
+- Crawls a target website from a starting URL.
+- Collects source files for HTML pages plus linked CSS and JavaScript assets.
+- Tracks crawl progress in real time while pages and assets are processed.
+- Organizes results into a built-in file manager with folder grouping and search.
+- Supports route-based file viewing, including paths like `/{site-slug}/{file-path}`.
+- Saves scrape sessions in browser storage so previously captured sites can be reopened.
+- Exports scraped content as single files, selected files, folders, full ZIP bundles, and JSON manifest data.
 
-## How it works
+## What Is Used
 
-- Frontend: `index.html`
-	- Submits scrape requests to `/api/scrape`.
-	- Renders saved scrapes and file manager.
-	- Uses history routes to open files directly.
-- Backend: `api/scrape.js`
-	- Crawls pages on the same origin.
-	- Extracts CSS/JS assets.
-	- Returns scraped files and metadata as JSON.
-
-## Local development
-
-1. Install Vercel CLI if needed.
-2. Run `vercel dev` in the project root.
-3. Open the local URL shown by Vercel.
-
-## Notes and limits
-
-- The crawler applies page/asset limits to avoid oversized responses.
-- Very large scrapes can exceed local storage limits.
-- Some sites block bot traffic or require JavaScript rendering; those pages may return incomplete content.
+- Frontend: single-page interface in `index.html` using vanilla HTML, CSS, and JavaScript.
+- Backend: serverless scraping endpoint in `api/scrape.js` (Node.js runtime).
+- Data flow: NDJSON stream events for live scrape progress and completion payloads.
+- Storage: browser `localStorage` for saved scrape sessions and preferences.
+- Export tooling: JSZip (browser-side ZIP generation).
+- Routing model: SPA history routing with file-style URLs and an updates route.
