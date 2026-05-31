@@ -6,6 +6,7 @@ const MAX_TOTAL_CHARS = 2_000_000;
 const MAX_DISCOVERED_ASSETS = 6000;
 const FETCH_TIMEOUT_MS = 12_000;
 const RENDER_TIMEOUT_MS = 20_000;
+const MAX_ASSET_CONCURRENCY = 6;
 const CODE_ASSET_TYPES = new Set(["css", "js", "json", "map"]);
 
 function json(status, payload) {
@@ -561,6 +562,7 @@ module.exports = async function handler(req, res) {
   let processedAssets = 0;
   let discoveredFromCode = 0;
   let sourceMapSourcesSaved = 0;
+  const assetConcurrency = Math.max(2, Math.min(MAX_ASSET_CONCURRENCY, isKnownJsHeavy || renderJs ? 6 : 4));
 
   const sendEvent = (event) => {
     res.write(`${JSON.stringify(event)}\n`);
@@ -583,6 +585,7 @@ module.exports = async function handler(req, res) {
     sameOriginAssetsOnly: effectiveSameOriginAssetsOnly,
     renderJs,
     aggressiveProfile: isKnownJsHeavy,
+    assetConcurrency,
   });
 
   while (queuedPages.length > 0 && visitedPages.size < pageLimit) {
@@ -708,66 +711,32 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  for (const assetUrl of assetQueue) {
-    if (fetchedAssets >= assetLimit) break;
-    processedAssets += 1;
+  let assetCursor = 0;
+  const nextAssetUrl = () => {
+    if (assetCursor >= assetQueue.length) return null;
+    const value = assetQueue[assetCursor];
+    assetCursor += 1;
+    return value;
+  };
 
-    let obj;
-    try {
-      obj = new URL(assetUrl);
-    } catch {
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        saved: false,
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
-      continue;
-    }
+  const runAssetWorker = async () => {
+    while (true) {
+      if (fetchedAssets >= assetLimit) return;
+      const assetUrl = nextAssetUrl();
+      if (!assetUrl) return;
 
-    if (!["http:", "https:"].includes(obj.protocol)) {
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        saved: false,
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
-      continue;
-    }
+      processedAssets += 1;
+      const processedSnapshot = processedAssets;
 
-    if (effectiveSameOriginAssetsOnly && obj.origin !== sourceOrigin) {
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        saved: false,
-        error: "Skipped external asset due to same-origin filter.",
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
-      continue;
-    }
-
-    const assetPath = makeAssetPath(obj, sourceOrigin);
-
-    try {
-      const { text, contentType } = await fetchText(assetUrl);
-      const lowerContentType = contentType.toLowerCase();
-
-      const inferredType = inferAssetType(assetPath, lowerContentType, text);
-      if (!CODE_ASSET_TYPES.has(inferredType)) {
+      let obj;
+      try {
+        obj = new URL(assetUrl);
+      } catch {
         sendEvent({
           type: "asset",
           url: assetUrl,
           saved: false,
-          assetsProcessed: processedAssets,
+          assetsProcessed: processedSnapshot,
           assetLimit,
           pagesVisited: visitedPages.size,
           pageLimit,
@@ -775,56 +744,120 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
-      pushFile(
-        filesMap,
-        {
+      if (!["http:", "https:"].includes(obj.protocol)) {
+        sendEvent({
+          type: "asset",
+          url: assetUrl,
+          saved: false,
+          assetsProcessed: processedSnapshot,
+          assetLimit,
+          pagesVisited: visitedPages.size,
+          pageLimit,
+        });
+        continue;
+      }
+
+      if (effectiveSameOriginAssetsOnly && obj.origin !== sourceOrigin) {
+        sendEvent({
+          type: "asset",
+          url: assetUrl,
+          saved: false,
+          error: "Skipped external asset due to same-origin filter.",
+          assetsProcessed: processedSnapshot,
+          assetLimit,
+          pagesVisited: visitedPages.size,
+          pageLimit,
+        });
+        continue;
+      }
+
+      const assetPath = makeAssetPath(obj, sourceOrigin);
+
+      try {
+        const { text, contentType } = await fetchText(assetUrl);
+        const lowerContentType = contentType.toLowerCase();
+
+        const inferredType = inferAssetType(assetPath, lowerContentType, text);
+        if (!CODE_ASSET_TYPES.has(inferredType)) {
+          sendEvent({
+            type: "asset",
+            url: assetUrl,
+            saved: false,
+            assetsProcessed: processedSnapshot,
+            assetLimit,
+            pagesVisited: visitedPages.size,
+            pageLimit,
+          });
+          continue;
+        }
+
+        if (fetchedAssets >= assetLimit) {
+          sendEvent({
+            type: "asset",
+            url: assetUrl,
+            saved: false,
+            error: "Skipped due to asset limit.",
+            assetsProcessed: processedSnapshot,
+            assetLimit,
+            pagesVisited: visitedPages.size,
+            pageLimit,
+          });
+          continue;
+        }
+
+        pushFile(
+          filesMap,
+          {
+            path: assetPath,
+            type: inferredType,
+            sourceUrl: assetUrl,
+            content: text,
+          },
+          counters,
+          warnings
+        );
+        fetchedAssets += 1;
+
+        if (inferredType === "map") {
+          sourceMapSourcesSaved += saveSourceMapSources(filesMap, assetPath, assetUrl, text, counters, warnings);
+        }
+
+        const nestedAssetLinks = extractAssetLinksFromCode(text, assetUrl);
+        for (const nestedAssetLink of nestedAssetLinks) {
+          if (seenAssets.size >= MAX_DISCOVERED_ASSETS) break;
+          if (seenAssets.has(nestedAssetLink)) continue;
+          seenAssets.add(nestedAssetLink);
+          assetQueue.push(nestedAssetLink);
+          discoveredFromCode += 1;
+        }
+
+        sendEvent({
+          type: "asset",
+          url: assetUrl,
           path: assetPath,
-          type: inferredType,
-          sourceUrl: assetUrl,
-          content: text,
-        },
-        counters,
-        warnings
-      );
-      fetchedAssets += 1;
-
-      if (inferredType === "map") {
-        sourceMapSourcesSaved += saveSourceMapSources(filesMap, assetPath, assetUrl, text, counters, warnings);
+          saved: true,
+          assetsProcessed: processedSnapshot,
+          assetLimit,
+          pagesVisited: visitedPages.size,
+          pageLimit,
+        });
+      } catch (error) {
+        warnings.push(`Failed asset: ${assetUrl} (${error.message})`);
+        sendEvent({
+          type: "asset",
+          url: assetUrl,
+          saved: false,
+          error: error.message,
+          assetsProcessed: processedSnapshot,
+          assetLimit,
+          pagesVisited: visitedPages.size,
+          pageLimit,
+        });
       }
-
-      const nestedAssetLinks = extractAssetLinksFromCode(text, assetUrl);
-      for (const nestedAssetLink of nestedAssetLinks) {
-        if (seenAssets.size >= MAX_DISCOVERED_ASSETS) break;
-        if (seenAssets.has(nestedAssetLink)) continue;
-        seenAssets.add(nestedAssetLink);
-        assetQueue.push(nestedAssetLink);
-        discoveredFromCode += 1;
-      }
-
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        path: assetPath,
-        saved: true,
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
-    } catch (error) {
-      warnings.push(`Failed asset: ${assetUrl} (${error.message})`);
-      sendEvent({
-        type: "asset",
-        url: assetUrl,
-        saved: false,
-        error: error.message,
-        assetsProcessed: processedAssets,
-        assetLimit,
-        pagesVisited: visitedPages.size,
-        pageLimit,
-      });
     }
-  }
+  };
+
+  await Promise.all(Array.from({ length: assetConcurrency }, () => runAssetWorker()));
 
   const files = Array.from(filesMap.values()).sort((a, b) => a.path.localeCompare(b.path));
   const assetsCoverage = seenAssets.size > 0 ? Math.min(1, fetchedAssets / seenAssets.size) : 1;
@@ -855,6 +888,7 @@ module.exports = async function handler(req, res) {
       aggressiveProfile: isKnownJsHeavy,
       discoveredFromCode,
       sourceMapSourcesSaved,
+      assetConcurrency,
       renderer: {
         mode: renderJs ? "enabled" : "disabled",
         shellPagesDetected: renderStats.shellPagesDetected,

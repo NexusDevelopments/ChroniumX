@@ -1576,11 +1576,15 @@
     searchTerm: '',
     previewMode: 'rendered',
     lastAutoProfileHost: null,
+    scrapeEtaSeconds: null,
+    scrapeTiming: null,
   };
   let pageLoadTimer = null;
   let pageLoadToken = 0;
   let previewBlobUrl = null;
   let previewAssetUrls = [];
+  let etaInterval = null;
+  const MAX_RENDERED_FILE_ROWS = 1400;
 
   function wait(ms) {
     return new Promise((resolve) => {
@@ -1893,9 +1897,39 @@
     statusText.textContent = `${done} / ${total}`;
   }
 
+  function formatDuration(seconds) {
+    const sec = Math.max(0, Math.round(Number(seconds) || 0));
+    const mins = Math.floor(sec / 60);
+    const rem = sec % 60;
+    return `${String(mins).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+  }
+
+  function stopEtaTicker() {
+    if (etaInterval) {
+      clearInterval(etaInterval);
+      etaInterval = null;
+    }
+  }
+
+  function startEtaTicker() {
+    stopEtaTicker();
+    etaInterval = setInterval(() => {
+      if (!running || !state.liveProgress) return;
+      if (typeof state.scrapeEtaSeconds !== 'number') return;
+      state.scrapeEtaSeconds = Math.max(0, state.scrapeEtaSeconds - 1);
+      const p = state.liveProgress;
+      const totalPages = Math.max(0, p.pageLimit || 0);
+      const totalAssets = Math.max(0, p.assetLimit || 0);
+      const donePages = Math.max(0, p.pagesVisited || 0);
+      const doneAssets = Math.max(0, p.assetsProcessed || 0);
+      statusText.textContent = `Pages ${donePages}/${totalPages} | Assets ${doneAssets}/${totalAssets} | ETA ${formatDuration(state.scrapeEtaSeconds)}`;
+    }, 1000);
+  }
+
   function setLiveProgress(progress) {
     state.liveProgress = progress;
     if (!progress) {
+      state.scrapeEtaSeconds = null;
       setProgress(0, 0);
       return;
     }
@@ -1907,8 +1941,75 @@
     const combinedTotal = Math.max(1, totalPages + totalAssets);
     const combinedDone = Math.min(combinedTotal, donePages + doneAssets);
 
+    const now = Date.now();
+    if (!state.scrapeTiming) {
+      state.scrapeTiming = {
+        startedAt: now,
+      };
+    }
+    const elapsedSec = Math.max(1, (now - state.scrapeTiming.startedAt) / 1000);
+    const rate = combinedDone / elapsedSec;
+    if (rate > 0.02) {
+      const remaining = Math.max(0, combinedTotal - combinedDone);
+      state.scrapeEtaSeconds = Math.round(remaining / rate);
+    }
+
     setProgress(combinedDone, combinedTotal);
-    statusText.textContent = `Pages ${donePages}/${totalPages} | Assets ${doneAssets}/${totalAssets}`;
+    const etaPart = typeof state.scrapeEtaSeconds === 'number'
+      ? ` | ETA ${formatDuration(state.scrapeEtaSeconds)}`
+      : '';
+    statusText.textContent = `Pages ${donePages}/${totalPages} | Assets ${doneAssets}/${totalAssets}${etaPart}`;
+  }
+
+  function scorePreviewCandidate(file) {
+    const path = String(file.path || '').toLowerCase();
+    const type = String(file.type || '').toLowerCase();
+    const content = String(file.content || '').toLowerCase();
+    const depth = path.split('/').length;
+    let score = 0;
+
+    if (type === 'html') score += 500;
+    if (path === 'index.html') score += 900;
+    if (path.endsWith('/index.html')) score += 700;
+    if (/<div[^>]+id=["'](?:app|root|__next|__nuxt)/.test(content)) score += 240;
+    if (content.includes('__next_data__') || content.includes('webpackchunk') || content.includes('createroot(') || content.includes('hydrate(')) score += 220;
+    if (content.includes('<script')) score += 120;
+
+    if (type === 'js') {
+      if (/(?:^|\/)(main|app|bundle|runtime|index)\.[mc]?(?:js|ts)x?$/.test(path)) score += 210;
+      if (content.includes('createroot(') || content.includes('hydrateroot(') || content.includes('__next_require__')) score += 180;
+    }
+
+    score -= depth * 2;
+    return score;
+  }
+
+  function pickBestFilePath(scrapeFiles, options = {}) {
+    const { preferredPath = '', htmlOnly = false } = options;
+    const allFiles = Object.values(scrapeFiles || {});
+    if (allFiles.length === 0) return null;
+
+    const preferred = String(preferredPath || '').trim();
+    if (preferred && scrapeFiles[preferred]) {
+      const preferredFile = scrapeFiles[preferred];
+      const preferredType = String((preferredFile && preferredFile.type) || '').toLowerCase();
+      if (!htmlOnly || preferredType === 'html') {
+        return preferred;
+      }
+    }
+
+    const candidates = htmlOnly
+      ? allFiles.filter((file) => String(file.type || '').toLowerCase() === 'html')
+      : allFiles;
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => {
+      const scoreDiff = scorePreviewCandidate(b) - scorePreviewCandidate(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      return String(a.path || '').localeCompare(String(b.path || ''));
+    });
+
+    return String(candidates[0].path || '') || null;
   }
 
   function safeStorageKey() {
@@ -2246,8 +2347,20 @@
 
     if (String(file.type || '').toLowerCase() !== 'html') {
       previewMetaEl.textContent = `Current file: ${file.path}`;
-      setPreviewStatus('Live Preview is available for HTML files only.');
-      renderPreviewMessage('This file type cannot be rendered as a full page preview. Open an HTML file to use Live Preview.');
+      const type = String(file.type || '').toLowerCase();
+      if (type === 'css') {
+        livePreviewEl.removeAttribute('src');
+        livePreviewEl.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${file.content || ''}</style><style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0f0f10;color:#ececec;padding:24px}.card{padding:18px;border:1px solid #2a2a2a;border-radius:10px;background:#171717}h1{margin:0 0 10px;font-size:1.15rem}p{margin:0 0 12px}.btn{display:inline-block;padding:8px 12px;border:1px solid #3a3a3a;border-radius:8px}</style></head><body><div class="card"><h1>CSS Preview Sandbox</h1><p>Rendering stylesheet: ${escapeHtml(file.path)}</p><a class="btn" href="#">Sample Button</a></div></body></html>`;
+        setPreviewStatus(`Previewing CSS sandbox for ${file.path}`);
+      } else {
+        const code = escapeHtml(file.content || '');
+        livePreviewEl.removeAttribute('src');
+        livePreviewEl.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;background:#101010;color:#d8d8d8;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}header{padding:10px 14px;border-bottom:1px solid #2a2a2a;background:#141414;font-size:12px;color:#b5b5b5}pre{margin:0;padding:14px;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5}</style></head><body><header>Code preview: ${escapeHtml(file.path)}</header><pre>${code}</pre></body></html>`;
+        setPreviewStatus(`Previewing ${type || 'text'} code: ${file.path}`);
+      }
+      previewRouteEl.textContent = state.activeSlug
+        ? `/preview/${encodeURIComponent(state.activeSlug)}/${file.path}`
+        : '/preview';
       return;
     }
 
@@ -2280,7 +2393,18 @@
     }
 
     ensureActiveScrapeAndFile();
-    renderLivePreview(currentFile());
+    let file = currentFile();
+    if (!file || String(file.type || '').toLowerCase() !== 'html') {
+      const scrape = currentScrape();
+      const previewPath = pickBestFilePath((scrape && scrape.files) || {}, {
+        preferredPath: state.activeFilePath,
+        htmlOnly: true,
+      });
+      if (previewPath && scrape && scrape.files && scrape.files[previewPath]) {
+        file = scrape.files[previewPath];
+      }
+    }
+    renderLivePreview(file);
   }
 
   function buildFileTree(files) {
@@ -2446,7 +2570,17 @@
       return;
     }
 
-    const tree = buildFileTree(visibleFiles);
+    const cappedFiles = visibleFiles.length > MAX_RENDERED_FILE_ROWS
+      ? visibleFiles.slice(0, MAX_RENDERED_FILE_ROWS)
+      : visibleFiles;
+    if (visibleFiles.length > MAX_RENDERED_FILE_ROWS) {
+      const notice = document.createElement('div');
+      notice.className = 'empty-console';
+      notice.textContent = `// Showing first ${MAX_RENDERED_FILE_ROWS} of ${visibleFiles.length} files for performance. Use search/filter to narrow.`;
+      fileListEl.appendChild(notice);
+    }
+
+    const tree = buildFileTree(cappedFiles);
     renderTreeNode(tree, fileListEl, []);
 
     const activeFile = currentFile();
@@ -2762,11 +2896,7 @@
 
   function pickInitialFile(scrapeFiles) {
     const preferred = (verifyEndpointInput.value || '').trim();
-    if (preferred && scrapeFiles[preferred]) return preferred;
-    if (scrapeFiles['index.html']) return 'index.html';
-    const nestedIndex = Object.keys(scrapeFiles).sort().find((path) => path.toLowerCase().endsWith('/index.html'));
-    if (nestedIndex) return nestedIndex;
-    return Object.keys(scrapeFiles).sort()[0] || null;
+    return pickBestFilePath(scrapeFiles, { preferredPath: preferred, htmlOnly: false });
   }
 
   async function runScrape() {
@@ -2821,6 +2951,9 @@
 
     running = true;
     startBtn.disabled = true;
+    state.scrapeTiming = { startedAt: Date.now() };
+    state.scrapeEtaSeconds = null;
+    startEtaTicker();
     setProgress(0, 1);
     savePrefs();
 
@@ -2885,6 +3018,9 @@
               assetsProcessed: 0,
             });
             log(`Crawl started for ${event.slug}.`, 'dim');
+            if (event.assetConcurrency) {
+              log(`Asset workers: ${event.assetConcurrency}`, 'num');
+            }
             if (event.aggressiveProfile) {
               log('Aggressive scrape profile enabled by backend.', 'warn');
             }
@@ -2945,6 +3081,9 @@
     } finally {
       log('─'.repeat(48), 'dim');
       running = false;
+      state.scrapeEtaSeconds = null;
+      state.scrapeTiming = null;
+      stopEtaTicker();
       startBtn.disabled = false;
     }
   }
