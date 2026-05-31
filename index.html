@@ -307,6 +307,121 @@
       letter-spacing: .08em;
     }
 
+    .tree-folder {
+      margin-bottom: 6px;
+    }
+
+    .tree-folder > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: .72rem;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tree-folder > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .tree-folder > summary::before {
+      content: '▸';
+      margin-right: 8px;
+      color: var(--muted);
+    }
+
+    .tree-folder[open] > summary::before {
+      content: '▾';
+    }
+
+    .tree-children {
+      margin-left: 14px;
+      margin-top: 6px;
+    }
+
+    .tree-file-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .tree-file-check {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .tree-file-link {
+      flex: 1;
+      color: #e8e8e8;
+      text-decoration: none;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: .72rem;
+      word-break: break-all;
+      background: #111;
+    }
+
+    .tree-file-link.active {
+      border-color: var(--border2);
+      background: #151515;
+    }
+
+    .mini-btn {
+      font-family: var(--font);
+      font-size: .62rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border2);
+      background: #111;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .folder-summary-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .folder-summary-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .mini-btn.compact {
+      padding: 4px 6px;
+      font-size: .58rem;
+    }
+
+    .status-meta {
+      font-size: .58rem;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .mini-btn:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+
     /* ── Footer ──────────────────────────────── */
     footer {
       margin-top: 36px;
@@ -329,7 +444,7 @@
 
   <header>
     <h1>ChroniumX</h1>
-    <p>Traffic Tester &mdash; max 100 &bull; min 5</p>
+    <p>Website Source Scraper &mdash; HTML, CSS, JS</p>
     <p style="font-size:.6rem;color:var(--muted);margin-top:3px;letter-spacing:.06em;">ChroniumX</p>
   </header>
 
@@ -345,52 +460,83 @@
 
       <div class="row">
         <div class="field">
-          <label>Visit Count</label>
-          <input type="number" id="countInput" min="5" max="100" value="10" />
-          <div class="hint">Min: 5 &nbsp;|&nbsp; Max: 100</div>
+          <label>Max Pages</label>
+          <input type="number" id="countInput" min="1" max="25" value="8" />
+          <div class="hint">Min: 1 &nbsp;|&nbsp; Max: 25</div>
         </div>
         <div class="field">
-          <label>Delay (ms)</label>
-          <input type="number" id="delayInput" min="100" max="5000" value="600" />
-          <div class="hint">Between each request</div>
+          <label>Max Assets (CSS/JS)</label>
+          <input type="number" id="delayInput" min="1" max="250" value="80" />
+          <div class="hint">Min: 1 &nbsp;|&nbsp; Max: 250</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Max Depth</label>
+          <input type="number" id="depthInput" min="1" max="10" value="3" />
+          <div class="hint">How far the crawler follows internal pages</div>
+        </div>
+        <div class="field">
+          <label>Asset Scope</label>
+          <label class="notice" style="display:flex;align-items:center;gap:8px;border-left:0;padding-left:0;margin-top:8px;">
+            <input type="checkbox" id="sameOriginAssetsInput" checked />
+            Same-origin assets only
+          </label>
         </div>
       </div>
 
       <div class="field">
-        <label>Real Visits Baseline</label>
-        <input type="number" id="realInput" min="0" value="0" />
-        <div class="hint">Set this to your real analytics count (human visits)</div>
+        <label>File Types</label>
+        <div class="filter-toggle-row">
+          <label class="filter-toggle"><input type="checkbox" id="typeHtmlInput" checked /> HTML</label>
+          <label class="filter-toggle"><input type="checkbox" id="typeCssInput" checked /> CSS</label>
+          <label class="filter-toggle"><input type="checkbox" id="typeJsInput" checked /> JS</label>
+        </div>
+        <div class="hint">Controls which scraped files appear in the manager and exports</div>
+      </div>
+
+      <div class="field">
+        <label>Custom Slug (Optional)</label>
+        <input type="text" id="realInput" value="" placeholder="example-com" />
+        <div class="hint">Override the generated scraped site shortname</div>
       </div>
 
       <div class="counter-grid">
         <div class="counter-card">
-          <div class="counter-label">Real Visits</div>
+          <div class="counter-label">Pages Crawled</div>
           <div class="counter-value" id="realCount">0</div>
         </div>
         <div class="counter-card">
-          <div class="counter-label">Global Test/Bot Visits</div>
+          <div class="counter-label">Assets Saved</div>
           <div class="counter-value" id="botCount">0</div>
         </div>
         <div class="counter-card">
-          <div class="counter-label">Total Visits</div>
+          <div class="counter-label">Files Saved</div>
           <div class="counter-value" id="totalCount">0</div>
         </div>
       </div>
 
       <div class="field">
-        <label>Global Counter Key</label>
-        <input type="text" id="counterKeyInput" value="sitjd-vercel-app" />
-        <div class="hint">Use the same key on every device to share one global test counter</div>
+        <label>Local Storage Key</label>
+        <input type="text" id="counterKeyInput" value="sourcevault.scrapes.v1" />
+        <div class="hint">Change this to use a different saved scrape namespace</div>
       </div>
 
       <div class="field">
-        <label>Site Verify Webhook (Optional)</label>
-        <input type="url" id="verifyEndpointInput" placeholder="https://sitjd.vercel.app/api/test-hit" />
-        <div class="hint">Called once per test hit so your own backend can verify and count it</div>
+        <label>Preferred Start File (Optional)</label>
+        <input type="text" id="verifyEndpointInput" placeholder="index.html" />
+        <div class="hint">If this file exists in scraped output, it opens first</div>
+      </div>
+
+      <div class="field">
+        <label>Saved Scrape</label>
+        <select id="siteSelect"></select>
+        <div class="hint">Switch active scraped site</div>
       </div>
 
       <div class="notice">
-        Test/Bot visits are tracked separately and shown in the global counter.
+        This app scrapes source files only. No bot traffic or test hits are sent.
       </div>
 
       <!-- Status bar -->
@@ -404,11 +550,37 @@
       </div>
 
       <div class="btn-row">
-        <button id="startBtn">&#9654;&nbsp; Start</button>
+        <button id="startBtn">&#9654;&nbsp; Scrape</button>
         <button id="clearBtn">Clear Console</button>
-        <button id="resetStatsBtn">Reset Counters</button>
+        <button id="resetStatsBtn">Delete Active Scrape</button>
       </div>
 
+    </div>
+  </div>
+
+  <div class="panel console-panel">
+    <div class="panel-title">
+      <span>File Manager</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="downloadCurrentBtn" class="mini-btn" type="button">Download File</button>
+        <button id="downloadAllBtn" class="mini-btn" type="button">Download ZIP</button>
+        <button id="downloadSelectedBtn" class="mini-btn" type="button">Selected ZIP</button>
+        <button id="downloadManifestBtn" class="mini-btn" type="button">Manifest JSON</button>
+        <span class="badge" id="selectedCount">0 selected</span>
+        <span class="badge" id="activeRoute">/</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding:10px 12px;">
+      <input id="searchInput" type="text" placeholder="Search files by name, path, or content" style="flex:1;background:#0d0d0d;border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:.76rem;padding:8px 10px;border-radius:4px;" />
+      <button id="clearSearchBtn" class="mini-btn" type="button">Clear</button>
+      <span class="badge" id="searchCount">0 results</span>
+    </div>
+    <div style="display:flex;gap:0;border-top:1px solid var(--border);min-height:280px;">
+      <div id="fileList" style="width:38%;min-width:220px;border-right:1px solid var(--border);padding:10px;overflow:auto;"></div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div id="sourceMeta" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:.68rem;color:var(--muted);word-break:break-all;">Source URL: -</div>
+        <pre id="sourceView" style="margin:0;padding:14px;font-size:.76rem;line-height:1.6;overflow:auto;flex:1;color:var(--c-info);background:#101010;">Select a scraped file to view its source.</pre>
+      </div>
     </div>
   </div>
 
@@ -425,57 +597,80 @@
 
   <footer>CHRONIUMX &copy; 2026</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-  const urlInput   = document.getElementById('urlInput');
+  const urlInput = document.getElementById('urlInput');
   const countInput = document.getElementById('countInput');
   const delayInput = document.getElementById('delayInput');
-  const realInput  = document.getElementById('realInput');
+  const depthInput = document.getElementById('depthInput');
+  const sameOriginAssetsInput = document.getElementById('sameOriginAssetsInput');
+  const typeHtmlInput = document.getElementById('typeHtmlInput');
+  const typeCssInput = document.getElementById('typeCssInput');
+  const typeJsInput = document.getElementById('typeJsInput');
+  const realInput = document.getElementById('realInput');
   const counterKeyInput = document.getElementById('counterKeyInput');
   const verifyEndpointInput = document.getElementById('verifyEndpointInput');
-  const startBtn   = document.getElementById('startBtn');
-  const clearBtn   = document.getElementById('clearBtn');
+  const siteSelectEl = document.getElementById('siteSelect');
+  const startBtn = document.getElementById('startBtn');
+  const clearBtn = document.getElementById('clearBtn');
   const resetStatsBtn = document.getElementById('resetStatsBtn');
-  const consoleEl  = document.getElementById('console');
-  const barFill    = document.getElementById('barFill');
+  const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
+  const downloadAllBtn = document.getElementById('downloadAllBtn');
+  const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
+  const downloadManifestBtn = document.getElementById('downloadManifestBtn');
+  const selectedCountEl = document.getElementById('selectedCount');
+  const searchInput = document.getElementById('searchInput');
+  const clearSearchBtn = document.getElementById('clearSearchBtn');
+  const searchCountEl = document.getElementById('searchCount');
+  const consoleEl = document.getElementById('console');
+  const barFill = document.getElementById('barFill');
   const statusText = document.getElementById('statusText');
-  const lineCount  = document.getElementById('lineCount');
-  const emptyMsg   = document.getElementById('emptyMsg');
+  const lineCount = document.getElementById('lineCount');
   const realCountEl = document.getElementById('realCount');
-  const botCountEl  = document.getElementById('botCount');
+  const botCountEl = document.getElementById('botCount');
   const totalCountEl = document.getElementById('totalCount');
+  const fileListEl = document.getElementById('fileList');
+  const sourceViewEl = document.getElementById('sourceView');
+  const sourceMetaEl = document.getElementById('sourceMeta');
+  const activeRouteEl = document.getElementById('activeRoute');
 
   let running = false;
   let logLines = 0;
-  const STATS_KEY = 'chroniumx.visitStats.v1';
-  const GLOBAL_NAMESPACE = 'chroniumx';
-  let visitStats = { real: 0, counterKey: 'sitjd-vercel-app', verifyEndpoint: '' };
-  let globalBotCount = 0;
-
-  /* ── Helpers ─────────────────────────────── */
-  function timestamp() {
-    const n = new Date();
-    return [n.getHours(), n.getMinutes(), n.getSeconds()]
-      .map(v => String(v).padStart(2,'0')).join(':');
-  }
-
-  const tagMap = {
-    info:    '[INFO]',
-    success: '[OK]  ',
-    warn:    '[WARN]',
-    error:   '[ERR] ',
-    sent:    '[SEND]',
-    dim:     '[SYS] ',
-    num:     '[STAT]',
-    url:     '[URL] ',
+  const PREFS_KEY = 'chroniumx.scraperPrefs.v1';
+  let currentStorageKey = 'sourcevault.scrapes.v1';
+  let state = {
+    scrapes: {},
+    activeSlug: null,
+    activeFilePath: null,
+    selectedFiles: new Set(),
+    liveProgress: null,
+    searchTerm: '',
   };
 
+  const tagMap = {
+    info: '[INFO]',
+    success: '[OK]  ',
+    warn: '[WARN]',
+    error: '[ERR] ',
+    sent: '[SEND]',
+    dim: '[SYS] ',
+    num: '[STAT]',
+    url: '[URL] ',
+  };
+
+  function timestamp() {
+    const n = new Date();
+    return [n.getHours(), n.getMinutes(), n.getSeconds()].map(v => String(v).padStart(2, '0')).join(':');
+  }
+
   function log(message, type = 'info') {
-    if (emptyMsg) emptyMsg.remove();
+    const empty = document.getElementById('emptyMsg');
+    if (empty) empty.remove();
 
     const line = document.createElement('div');
     line.className = 'log-line';
 
-    const ts  = document.createElement('span');
+    const ts = document.createElement('span');
     ts.className = 'ts';
     ts.textContent = timestamp();
 
@@ -492,300 +687,901 @@
     line.appendChild(msg);
     consoleEl.appendChild(line);
 
-    logLines++;
+    logLines += 1;
     lineCount.textContent = `${logLines} line${logLines !== 1 ? 's' : ''}`;
     consoleEl.scrollTop = consoleEl.scrollHeight;
   }
 
   function setProgress(done, total) {
-    const pct = total > 0 ? (done / total) * 100 : 0;
-    barFill.style.width = pct + '%';
+    const pct = total > 0 ? Math.min(100, Math.max(0, (done / total) * 100)) : 0;
+    barFill.style.width = `${pct}%`;
     statusText.textContent = `${done} / ${total}`;
   }
 
-  function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
+  function setLiveProgress(progress) {
+    state.liveProgress = progress;
+    if (!progress) {
+      setProgress(0, 0);
+      return;
+    }
+
+    const totalPages = Math.max(0, progress.pageLimit || 0);
+    const totalAssets = Math.max(0, progress.assetLimit || 0);
+    const donePages = Math.max(0, progress.pagesVisited || 0);
+    const doneAssets = Math.max(0, progress.assetsProcessed || 0);
+    const combinedTotal = Math.max(1, totalPages + totalAssets);
+    const combinedDone = Math.min(combinedTotal, donePages + doneAssets);
+
+    setProgress(combinedDone, combinedTotal);
+    statusText.textContent = `Pages ${donePages}/${totalPages} | Assets ${doneAssets}/${totalAssets}`;
   }
 
-  function loadStats() {
+  function safeStorageKey() {
+    return (counterKeyInput.value || '').trim() || 'sourcevault.scrapes.v1';
+  }
+
+  function savePrefs() {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      key: safeStorageKey(),
+      preferredFile: (verifyEndpointInput.value || '').trim(),
+      customSlug: (realInput.value || '').trim(),
+      depth: depthInput.value,
+      sameOriginAssetsOnly: sameOriginAssetsInput.checked,
+      fileTypes: {
+        html: typeHtmlInput.checked,
+        css: typeCssInput.checked,
+        js: typeJsInput.checked,
+      },
+      searchTerm: (searchInput.value || '').trim(),
+    }));
+  }
+
+  function loadPrefs() {
     try {
-      const raw = localStorage.getItem(STATS_KEY);
+      const raw = localStorage.getItem(PREFS_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.real === 'number') {
-        visitStats.real = Math.max(0, Math.floor(parsed.real));
-      }
-      if (typeof parsed.counterKey === 'string' && parsed.counterKey.trim()) {
-        visitStats.counterKey = parsed.counterKey.trim();
-      }
-      if (typeof parsed.verifyEndpoint === 'string') {
-        visitStats.verifyEndpoint = parsed.verifyEndpoint.trim();
-      }
-    } catch {
-      visitStats = { real: 0, counterKey: 'sitjd-vercel-app', verifyEndpoint: '' };
-    }
-  }
-
-  function saveStats() {
-    localStorage.setItem(STATS_KEY, JSON.stringify(visitStats));
-  }
-
-  function renderStats() {
-    const total = visitStats.real + globalBotCount;
-    realCountEl.textContent = String(visitStats.real);
-    botCountEl.textContent = String(globalBotCount);
-    totalCountEl.textContent = String(total);
-    realInput.value = String(visitStats.real);
-    counterKeyInput.value = visitStats.counterKey;
-    verifyEndpointInput.value = visitStats.verifyEndpoint;
-  }
-
-  function safeCounterKey() {
-    return (visitStats.counterKey || 'sitjd-vercel-app')
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || 'sitjd-vercel-app';
-  }
-
-  async function syncGlobalCounter() {
-    const key = safeCounterKey();
-    const endpoint = `https://api.countapi.xyz/get/${GLOBAL_NAMESPACE}/${key}`;
-    try {
-      const res = await fetch(endpoint, { cache: 'no-store' });
-      const data = await res.json();
-      if (typeof data.value === 'number') {
-        globalBotCount = Math.max(0, Math.floor(data.value));
-      } else {
-        globalBotCount = 0;
-      }
-      renderStats();
-      log(`Global counter synced for key "${key}".`, 'num');
-    } catch {
-      log('Could not sync global counter right now.', 'warn');
-    }
-  }
-
-  async function incrementGlobalCounter() {
-    const key = safeCounterKey();
-    const endpoint = `https://api.countapi.xyz/hit/${GLOBAL_NAMESPACE}/${key}`;
-    try {
-      const res = await fetch(endpoint, { cache: 'no-store' });
-      const data = await res.json();
-      if (typeof data.value === 'number') {
-        globalBotCount = Math.max(0, Math.floor(data.value));
-      }
-    } catch {
-      globalBotCount += 1;
-      log('Global counter API unavailable, showing local fallback increment.', 'warn');
-    }
-    renderStats();
-  }
-
-  async function resetGlobalCounter() {
-    const key = safeCounterKey();
-    const endpoint = `https://api.countapi.xyz/set/${GLOBAL_NAMESPACE}/${key}?value=0`;
-    try {
-      const res = await fetch(endpoint, { cache: 'no-store' });
-      const data = await res.json();
-      if (typeof data.value === 'number') {
-        globalBotCount = Math.max(0, Math.floor(data.value));
-      } else {
-        globalBotCount = 0;
-      }
-      renderStats();
-      log(`Global counter reset for key "${key}".`, 'warn');
-    } catch {
-      log('Could not reset global counter right now.', 'error');
-    }
-  }
-
-  async function notifyVerifyEndpoint(targetUrl, status, index) {
-    const endpoint = (visitStats.verifyEndpoint || '').trim();
-    if (!endpoint) return;
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          source: 'chroniumx',
-          targetUrl,
-          status,
-          index,
-          counterKey: safeCounterKey(),
-          timestamp: new Date().toISOString(),
-        }),
-        cache: 'no-store',
-        keepalive: true,
-      });
-      if (res.ok) {
-        log(`Verify webhook accepted hit ${index}.`, 'success');
-      } else {
-        log(`Verify webhook returned ${res.status} on hit ${index}.`, 'warn');
-      }
-    } catch {
-      log(`Verify webhook request failed on hit ${index}.`, 'warn');
-    }
-  }
-
-  /* ── Hidden iframe container ───────────────── */
-  const iframeBox = document.createElement('div');
-  iframeBox.style.cssText = 'position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;top:-9999px;left:-9999px;';
-  document.body.appendChild(iframeBox);
-
-  /* ── Send test visit via iframe load ───────── */
-  function sendVisit(url, index, total) {
-    return new Promise((resolve) => {
-      log(`Sending visit ${index} of ${total}  →  ${url}`, 'sent');
-      const start = performance.now();
-      const iframe = document.createElement('iframe');
-      iframe.sandbox = 'allow-scripts allow-same-origin';
-      iframe.referrerPolicy = 'no-referrer';
-      let settled = false;
-
-      const done = async (status) => {
-        if (settled) return;
-        settled = true;
-        const ms = Math.round(performance.now() - start);
-        await incrementGlobalCounter();
-        await notifyVerifyEndpoint(url, status, index);
-        if (status === 'ok') {
-          log(`Test visit ${index} loaded  (${ms} ms)`, 'success');
-        } else {
-          log(`Test visit ${index} timed out / blocked  (${ms} ms)`, 'warn');
+      const prefs = JSON.parse(raw);
+      if (prefs && typeof prefs === 'object') {
+        if (typeof prefs.key === 'string' && prefs.key.trim()) {
+          counterKeyInput.value = prefs.key.trim();
         }
-        iframe.remove();
-        resolve();
-      };
+        if (typeof prefs.preferredFile === 'string') {
+          verifyEndpointInput.value = prefs.preferredFile;
+        }
+        if (typeof prefs.customSlug === 'string') {
+          realInput.value = prefs.customSlug;
+        }
+        if (typeof prefs.depth !== 'undefined') {
+          depthInput.value = String(prefs.depth || '3');
+        }
+        if (typeof prefs.sameOriginAssetsOnly === 'boolean') {
+          sameOriginAssetsInput.checked = prefs.sameOriginAssetsOnly;
+        }
+        if (prefs.fileTypes && typeof prefs.fileTypes === 'object') {
+          if (typeof prefs.fileTypes.html === 'boolean') typeHtmlInput.checked = prefs.fileTypes.html;
+          if (typeof prefs.fileTypes.css === 'boolean') typeCssInput.checked = prefs.fileTypes.css;
+          if (typeof prefs.fileTypes.js === 'boolean') typeJsInput.checked = prefs.fileTypes.js;
+        }
+        if (typeof prefs.searchTerm === 'string') {
+          searchInput.value = prefs.searchTerm;
+          state.searchTerm = prefs.searchTerm.trim().toLowerCase();
+        }
+      }
+    } catch {}
+  }
 
-      // Fallback timeout — some sites block iframes, still counts as a hit
-      const timer = setTimeout(() => done('timeout'), 12000);
-      iframe.onload  = () => { clearTimeout(timer); done('ok'); };
-      iframe.onerror = () => { clearTimeout(timer); done('timeout'); };
+  function loadScrapes(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
 
-      iframe.src = url + (url.includes('?') ? '&' : '?') + '_v=' + Date.now();
-      iframeBox.appendChild(iframe);
+  function saveScrapes() {
+    localStorage.setItem(currentStorageKey, JSON.stringify(state.scrapes));
+  }
+
+  function parseRoute(pathname) {
+    const parts = pathname.split('/').filter(Boolean).map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
+
+    if (parts.length === 0) return { slug: null, filePath: null };
+    return { slug: parts[0], filePath: parts.slice(1).join('/') || null };
+  }
+
+  function makeRoute(slug, filePath) {
+    const left = encodeURIComponent(slug);
+    if (!filePath) return `/${left}`;
+    const right = filePath.split('/').map(part => encodeURIComponent(part)).join('/');
+    return `/${left}/${right}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function slugify(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'site';
+  }
+
+  function filesForActive() {
+    const scrape = state.activeSlug ? state.scrapes[state.activeSlug] : null;
+    if (!scrape || !scrape.files) return [];
+    return Object.values(scrape.files).sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  function activeTypeFilters() {
+    return new Set([
+      typeHtmlInput.checked ? 'html' : null,
+      typeCssInput.checked ? 'css' : null,
+      typeJsInput.checked ? 'js' : null,
+    ].filter(Boolean));
+  }
+
+  function matchesSearch(file) {
+    const term = (state.searchTerm || '').trim();
+    if (!term) return true;
+    const haystack = `${file.path || ''}\n${file.sourceUrl || ''}\n${file.content || ''}`.toLowerCase();
+    return haystack.includes(term);
+  }
+
+  function filterFiles(files) {
+    const typeFilters = activeTypeFilters();
+    return files.filter((file) => {
+      const type = String(file.type || 'text').toLowerCase();
+      if (!typeFilters.has(type)) return false;
+      return matchesSearch(file);
     });
   }
 
-  /* ── Main routine ────────────────────────── */
-  async function run() {
-    const url   = urlInput.value.trim();
-    let   count = parseInt(countInput.value, 10);
-    const delay = Math.max(100, parseInt(delayInput.value, 10) || 600);
+  function currentScrape() {
+    return state.activeSlug ? state.scrapes[state.activeSlug] : null;
+  }
 
-    /* Validate */
+  function currentFile() {
+    const scrape = currentScrape();
+    if (!scrape || !state.activeFilePath) return null;
+    return (scrape.files || {})[state.activeFilePath] || null;
+  }
+
+  function currentFilesByPath() {
+    const scrape = currentScrape();
+    return scrape && scrape.files ? scrape.files : {};
+  }
+
+  function buildFileTree(files) {
+    const root = { folders: new Map(), files: [] };
+
+    for (const file of files) {
+      const parts = String(file.path || '').split('/').filter(Boolean);
+      let node = root;
+
+      if (parts.length === 0) {
+        continue;
+      }
+
+      for (let i = 0; i < parts.length - 1; i += 1) {
+        const folderName = parts[i];
+        if (!node.folders.has(folderName)) {
+          node.folders.set(folderName, { folders: new Map(), files: [] });
+        }
+        node = node.folders.get(folderName);
+      }
+
+      node.files.push(file);
+    }
+
+    return root;
+  }
+
+  function collectFilesFromNode(node) {
+    const collected = [...node.files];
+    for (const child of node.folders.values()) {
+      collected.push(...collectFilesFromNode(child));
+    }
+    return collected;
+  }
+
+  function downloadBlob(content, filename, type = 'text/plain;charset=utf-8') {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function sanitizeDownloadName(name) {
+    return String(name || 'file').replace(/[\\/:*?"<>|]+/g, '_');
+  }
+
+  function downloadCurrentFile() {
+    const file = currentFile();
+    if (!file) {
+      log('No active file selected for download.', 'warn');
+      return;
+    }
+
+    downloadBlob(file.content || '', sanitizeDownloadName(file.path || 'file.txt'));
+    log(`Downloaded file: ${file.path}`, 'success');
+  }
+
+  async function downloadAllFiles() {
+    const scrape = currentScrape();
+    if (!scrape) {
+      log('No active scrape selected for ZIP download.', 'warn');
+      return;
+    }
+
+    const files = filesForActive();
+    if (files.length === 0) {
+      log('No files available to export.', 'warn');
+      return;
+    }
+
+    if (!window.JSZip) {
+      log('ZIP library failed to load.', 'error');
+      return;
+    }
+
+    const zip = new JSZip();
+    for (const file of files) {
+      zip.file(file.path, file.content || '');
+    }
+
+    log('Building ZIP export...', 'dim');
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const baseName = sanitizeDownloadName(scrape.slug || 'scrape');
+    downloadBlob(blob, `${baseName}.zip`, 'application/zip');
+    log(`Downloaded ZIP for ${scrape.slug}.`, 'success');
+  }
+
+  function renderSiteSelect() {
+    const slugs = Object.keys(state.scrapes).sort();
+    siteSelectEl.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = slugs.length ? 'Select a scraped site' : 'No saved scrapes yet';
+    siteSelectEl.appendChild(placeholder);
+
+    for (const slug of slugs) {
+      const opt = document.createElement('option');
+      opt.value = slug;
+      opt.textContent = slug;
+      if (slug === state.activeSlug) opt.selected = true;
+      siteSelectEl.appendChild(opt);
+    }
+  }
+
+  function renderCounters() {
+    const active = currentScrape();
+    if (!active) {
+      realCountEl.textContent = '0';
+      botCountEl.textContent = '0';
+      totalCountEl.textContent = '0';
+      return;
+    }
+
+    realCountEl.textContent = String(Number((active.stats && active.stats.pagesVisited) || 0));
+    botCountEl.textContent = String(Number((active.stats && active.stats.assetsSaved) || 0));
+    totalCountEl.textContent = String(Object.keys(active.files || {}).length);
+  }
+
+  function renderFileManager() {
+    const files = filesForActive();
+    fileListEl.innerHTML = '';
+    updateSelectedCount();
+    state.searchTerm = (searchInput.value || '').trim().toLowerCase();
+
+    if (!state.activeSlug) {
+      fileListEl.innerHTML = '<div class="empty-console">// No scraped site selected</div>';
+      activeRouteEl.textContent = '/';
+      sourceMetaEl.textContent = 'Source URL: -';
+      sourceViewEl.textContent = 'Select a scraped file to view its source.';
+      searchCountEl.textContent = '0 results';
+      return;
+    }
+
+    const visibleFiles = filterFiles(files);
+    searchCountEl.textContent = `${visibleFiles.length} result${visibleFiles.length === 1 ? '' : 's'}`;
+
+    if (files.length === 0) {
+      fileListEl.innerHTML = '<div class="empty-console">// No files saved for this scrape</div>';
+      return;
+    }
+
+    if (visibleFiles.length === 0) {
+      fileListEl.innerHTML = '<div class="empty-console">// No files match the current filters</div>';
+      return;
+    }
+
+    const tree = buildFileTree(visibleFiles);
+    renderTreeNode(tree, fileListEl, []);
+
+    const activeFile = currentFile();
+    activeRouteEl.textContent = state.activeFilePath
+      ? makeRoute(state.activeSlug, state.activeFilePath)
+      : `/${encodeURIComponent(state.activeSlug)}`;
+
+    if (!activeFile) {
+      sourceMetaEl.textContent = 'Source URL: -';
+      sourceViewEl.textContent = 'Pick a file from the list to view its content.';
+      return;
+    }
+
+    sourceMetaEl.textContent = `Source URL: ${activeFile.sourceUrl || '-'}`;
+    sourceViewEl.textContent = activeFile.content || '';
+  }
+
+  function renderTreeNode(node, container, pathParts) {
+    const folderNames = Array.from(node.folders.keys()).sort((a, b) => a.localeCompare(b));
+    const files = [...node.files].sort((a, b) => a.path.localeCompare(b.path));
+
+    for (const folderName of folderNames) {
+      const folder = node.folders.get(folderName);
+      const details = document.createElement('details');
+      details.className = 'tree-folder';
+      details.open = pathParts.length < 2;
+      const folderPath = [...pathParts, folderName].join('/');
+
+      const summary = document.createElement('summary');
+
+      const label = document.createElement('span');
+      label.className = 'folder-summary-label';
+      label.innerHTML = `<span>${escapeHtml(folderName)}</span><span style="color:var(--muted);font-size:.58rem;">${collectFilesFromNode(folder).length} files</span>`;
+
+      const actions = document.createElement('span');
+      actions.className = 'folder-summary-actions';
+
+      const folderZipBtn = document.createElement('button');
+      folderZipBtn.type = 'button';
+      folderZipBtn.className = 'mini-btn compact';
+      folderZipBtn.textContent = 'ZIP';
+      folderZipBtn.title = `Download ${folderPath} as ZIP`;
+      folderZipBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const branchFiles = collectFilesFromNode(folder);
+        if (branchFiles.length === 0) {
+          log(`No files found in folder: ${folderPath}`, 'warn');
+          return;
+        }
+
+        if (!window.JSZip) {
+          log('ZIP library failed to load.', 'error');
+          return;
+        }
+
+        const zip = new JSZip();
+        for (const branchFile of branchFiles) {
+          zip.file(branchFile.path, branchFile.content || '');
+        }
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        downloadBlob(blob, `${sanitizeDownloadName(folderPath || folderName)}.zip`, 'application/zip');
+        log(`Downloaded folder ZIP: ${folderPath}`, 'success');
+      });
+
+      actions.appendChild(folderZipBtn);
+
+      summary.appendChild(label);
+      summary.appendChild(actions);
+      details.appendChild(summary);
+
+      const childWrap = document.createElement('div');
+      childWrap.className = 'tree-children';
+      renderTreeNode(folder, childWrap, [...pathParts, folderName]);
+      details.appendChild(childWrap);
+      container.appendChild(details);
+    }
+
+    for (const file of files) {
+      const row = document.createElement('div');
+      row.className = 'tree-file-row';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'tree-file-check';
+      checkbox.checked = state.selectedFiles.has(file.path);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          state.selectedFiles.add(file.path);
+        } else {
+          state.selectedFiles.delete(file.path);
+        }
+        updateSelectedCount();
+      });
+
+      const link = document.createElement('a');
+      link.className = 'tree-file-link' + (state.activeFilePath === file.path ? ' active' : '');
+      link.href = makeRoute(state.activeSlug, file.path);
+      link.innerHTML = `${escapeHtml(file.path.split('/').pop() || file.path)} <span style="color:var(--muted);font-size:.62rem;">[${escapeHtml(file.type || 'text')}]</span>`;
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        state.activeFilePath = file.path;
+        history.pushState({}, '', makeRoute(state.activeSlug, state.activeFilePath));
+        renderFileManager();
+      });
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.type = 'button';
+      downloadBtn.className = 'mini-btn';
+      downloadBtn.textContent = 'DL';
+      downloadBtn.title = `Download ${file.path}`;
+      downloadBtn.addEventListener('click', () => {
+        downloadBlob(file.content || '', sanitizeDownloadName(file.path || 'file.txt'));
+        log(`Downloaded file: ${file.path}`, 'success');
+      });
+
+      row.appendChild(checkbox);
+      row.appendChild(link);
+      row.appendChild(downloadBtn);
+      container.appendChild(row);
+    }
+  }
+
+  function updateSelectedCount() {
+    selectedCountEl.textContent = `${state.selectedFiles.size} selected`;
+  }
+
+  function resetSelections() {
+    state.selectedFiles = new Set();
+    updateSelectedCount();
+  }
+
+  function applyRoute() {
+    const { slug, filePath } = parseRoute(window.location.pathname);
+    if (!slug || !state.scrapes[slug]) {
+      state.activeSlug = null;
+      state.activeFilePath = null;
+      resetSelections();
+      renderSiteSelect();
+      renderCounters();
+      renderFileManager();
+      return;
+    }
+
+    state.activeSlug = slug;
+    const files = filesForActive();
+    if (filePath && state.scrapes[slug].files && state.scrapes[slug].files[filePath]) {
+      state.activeFilePath = filePath;
+    } else {
+      state.activeFilePath = files[0] ? files[0].path : null;
+    }
+
+    renderSiteSelect();
+    renderCounters();
+    renderFileManager();
+  }
+
+  function buildManifest(scrape) {
+    const files = Object.values(scrape.files || {}).map((file) => ({
+      path: file.path,
+      type: file.type,
+      sourceUrl: file.sourceUrl,
+      size: file.size,
+    }));
+
+    return {
+      slug: scrape.slug,
+      sourceUrl: scrape.sourceUrl,
+      createdAt: scrape.createdAt,
+      stats: scrape.stats,
+      warnings: scrape.warnings,
+      files,
+    };
+  }
+
+  function applyScrapePayload(payload, fallbackUrl, customSlugRaw) {
+    const files = {};
+    for (const file of (payload.files || [])) {
+      if (!file || !file.path || typeof file.content !== 'string') continue;
+      files[file.path] = {
+        path: String(file.path),
+        type: String(file.type || 'text'),
+        sourceUrl: String(file.sourceUrl || ''),
+        content: file.content,
+        size: Number(file.size || file.content.length || 0),
+      };
+    }
+
+    const finalSlug = customSlugRaw ? slugify(customSlugRaw) : slugify(payload.slug || 'site');
+    state.scrapes[finalSlug] = {
+      slug: finalSlug,
+      sourceUrl: String(payload.sourceUrl || fallbackUrl),
+      createdAt: String(payload.createdAt || new Date().toISOString()),
+      stats: payload.stats || {},
+      warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+      files,
+    };
+
+    saveScrapes();
+    state.activeSlug = finalSlug;
+    state.activeFilePath = pickInitialFile(files);
+    resetSelections();
+    history.pushState({}, '', state.activeFilePath ? makeRoute(finalSlug, state.activeFilePath) : `/${encodeURIComponent(finalSlug)}`);
+
+    const fileTotal = Object.keys(files).length;
+    setProgress(fileTotal, fileTotal || 1);
+    renderSiteSelect();
+    renderCounters();
+    renderFileManager();
+
+    log(`Scrape complete. Saved ${fileTotal} files to slug "${finalSlug}".`, 'success');
+    if (state.scrapes[finalSlug].warnings.length > 0) {
+      log(`Warnings: ${state.scrapes[finalSlug].warnings.length}`, 'warn');
+    }
+  }
+
+  async function readNdjsonStream(response, onEvent) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex = buffer.indexOf('\n');
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line) {
+          try {
+            onEvent(JSON.parse(line));
+          } catch {
+            // Ignore partial/bad lines.
+          }
+        }
+        newlineIndex = buffer.indexOf('\n');
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail) {
+      try {
+        onEvent(JSON.parse(tail));
+      } catch {
+        // Ignore trailing parse errors.
+      }
+    }
+  }
+
+  function pickInitialFile(scrapeFiles) {
+    const preferred = (verifyEndpointInput.value || '').trim();
+    if (preferred && scrapeFiles[preferred]) return preferred;
+    return Object.keys(scrapeFiles).sort()[0] || null;
+  }
+
+  async function runScrape() {
+    const url = (urlInput.value || '').trim();
+    let maxPages = parseInt(countInput.value, 10);
+    let maxAssets = parseInt(delayInput.value, 10);
+    let maxDepth = parseInt(depthInput.value, 10);
+    const customSlugRaw = (realInput.value || '').trim();
+
     if (!url) {
       log('No target URL provided.', 'error');
       return;
     }
-    try { new URL(url); } catch {
-      log('Invalid URL format.  Example: https://example.com', 'error');
+
+    try {
+      const parsedUrl = new URL(url);
+      if (!(parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:')) throw new Error('protocol');
+    } catch {
+      log('Invalid URL format. Example: https://example.com', 'error');
       return;
     }
-    if (isNaN(count) || count < 5) {
-      log('Visit count must be at least 5.  Clamping to 5.', 'warn');
-      count = 5;
-      countInput.value = 5;
+
+    if (Number.isNaN(maxPages) || maxPages < 1) {
+      maxPages = 1;
+      countInput.value = '1';
     }
-    if (count > 100) {
-      log('Visit count exceeds maximum of 100.  Clamping to 100.', 'warn');
-      count = 100;
-      countInput.value = 100;
+    if (maxPages > 25) {
+      maxPages = 25;
+      countInput.value = '25';
+    }
+    if (Number.isNaN(maxAssets) || maxAssets < 1) {
+      maxAssets = 1;
+      delayInput.value = '1';
+    }
+    if (maxAssets > 250) {
+      maxAssets = 250;
+      delayInput.value = '250';
+    }
+    if (Number.isNaN(maxDepth) || maxDepth < 1) {
+      maxDepth = 1;
+      depthInput.value = '1';
+    }
+    if (maxDepth > 10) {
+      maxDepth = 10;
+      depthInput.value = '10';
     }
 
     running = true;
     startBtn.disabled = true;
-    setProgress(0, count);
+    setProgress(0, 1);
+    savePrefs();
 
     log('─'.repeat(48), 'dim');
-    log(`Session started (test traffic mode)`, 'dim');
-    log(`Target   :  ${url}`, 'url');
-    log(`Test hits:  ${count}`, 'num');
-    log(`Delay    :  ${delay} ms`, 'num');
-    log(`Real base:  ${visitStats.real}`, 'num');
-    log(`Global key: ${safeCounterKey()}`, 'num');
-    log('─'.repeat(48), 'dim');
+    log('Session started (website source scrape mode)', 'dim');
+    log(`Target URL  : ${url}`, 'url');
+    log(`Max pages   : ${maxPages}`, 'num');
+    log(`Max assets  : ${maxAssets}`, 'num');
+    log(`Max depth   : ${maxDepth}`, 'num');
+    log(`Same-origin : ${sameOriginAssetsInput.checked ? 'assets only' : 'all assets'}`, 'num');
+    log('No bot traffic will be sent.', 'success');
 
-    for (let i = 1; i <= count; i++) {
-      if (!running) {
-        log('Session aborted by user.', 'warn');
-        break;
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          maxPages,
+          maxAssets,
+          maxDepth,
+          sameOriginAssetsOnly: sameOriginAssetsInput.checked,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Scrape failed';
+        try {
+          const errorPayload = await response.json();
+          errorMessage = errorPayload.error || errorMessage;
+        } catch {}
+        throw new Error(errorMessage);
       }
-      await sendVisit(url, i, count);
-      setProgress(i, count);
-      if (i < count) await sleep(delay);
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/x-ndjson') && response.body) {
+        await readNdjsonStream(response, (event) => {
+          if (!event || typeof event !== 'object') return;
+
+          if (event.type === 'start') {
+            setLiveProgress({
+              pageLimit: event.pageLimit,
+              assetLimit: event.assetLimit,
+              pagesVisited: 0,
+              assetsProcessed: 0,
+            });
+            log(`Crawl started for ${event.slug}.`, 'dim');
+            return;
+          }
+
+          if (event.type === 'page') {
+            setLiveProgress({
+              pageLimit: event.pageLimit,
+              assetLimit: event.assetLimit,
+              pagesVisited: event.pagesVisited,
+              assetsProcessed: event.assetsProcessed,
+            });
+            log(`Page ${event.pagesVisited}/${event.pageLimit}: ${event.url}`, event.error ? 'warn' : 'num');
+            if (event.error) {
+              log(`Page warning: ${event.error}`, 'warn');
+            }
+            return;
+          }
+
+          if (event.type === 'asset') {
+            setLiveProgress({
+              pageLimit: event.pageLimit,
+              assetLimit: event.assetLimit,
+              pagesVisited: event.pagesVisited,
+              assetsProcessed: event.assetsProcessed,
+            });
+            log(`Asset ${event.assetsProcessed}/${event.assetLimit}: ${event.url}`, event.saved ? 'success' : 'dim');
+            if (event.error) {
+              log(`Asset warning: ${event.error}`, 'warn');
+            }
+            return;
+          }
+
+          if (event.type === 'warning') {
+            log(event.message || 'Warning during scrape.', 'warn');
+            return;
+          }
+
+          if (event.type === 'done') {
+            setLiveProgress({
+              pageLimit: event.payload.stats.pageLimit,
+              assetLimit: event.payload.stats.assetLimit,
+              pagesVisited: event.payload.stats.pagesVisited,
+              assetsProcessed: event.payload.stats.assetsSaved,
+            });
+            applyScrapePayload(event.payload, url, customSlugRaw);
+          }
+        });
+      } else {
+        const payload = await response.json();
+        applyScrapePayload(payload, url, customSlugRaw);
+      }
+    } catch (error) {
+      log(`Scrape failed: ${error.message}`, 'error');
+      setProgress(0, 1);
+    } finally {
+      log('─'.repeat(48), 'dim');
+      running = false;
+      startBtn.disabled = false;
     }
-
-    log('─'.repeat(48), 'dim');
-    log(`Session complete  —  ${count} test visit${count !== 1 ? 's' : ''} sent.`, 'success');
-    log(`Totals now  —  real ${visitStats.real}, bot ${globalBotCount}, total ${visitStats.real + globalBotCount}`, 'num');
-    log('─'.repeat(48), 'dim');
-
-    running = false;
-    startBtn.disabled = false;
   }
 
-  /* ── Events ──────────────────────────────── */
   startBtn.addEventListener('click', () => {
-    if (!running) run();
+    if (!running) runScrape();
+  });
+
+  downloadCurrentBtn.addEventListener('click', downloadCurrentFile);
+  downloadAllBtn.addEventListener('click', () => {
+    downloadAllFiles().catch((error) => {
+      log(`ZIP download failed: ${error.message}`, 'error');
+    });
+  });
+
+  downloadSelectedBtn.addEventListener('click', async () => {
+    const scrape = currentScrape();
+    if (!scrape) {
+      log('No active scrape selected for selected-file ZIP.', 'warn');
+      return;
+    }
+
+    const selectedFiles = Array.from(state.selectedFiles)
+      .map((path) => (scrape.files || {})[path])
+      .filter(Boolean);
+
+    if (selectedFiles.length === 0) {
+      log('Select one or more files first.', 'warn');
+      return;
+    }
+
+    if (!window.JSZip) {
+      log('ZIP library failed to load.', 'error');
+      return;
+    }
+
+    const zip = new JSZip();
+    for (const file of selectedFiles) {
+      zip.file(file.path, file.content || '');
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(blob, `${sanitizeDownloadName(scrape.slug || 'scrape')}-selected.zip`, 'application/zip');
+    log(`Downloaded ${selectedFiles.length} selected files.`, 'success');
+  });
+
+  downloadManifestBtn.addEventListener('click', () => {
+    const scrape = currentScrape();
+    if (!scrape) {
+      log('No active scrape selected for manifest export.', 'warn');
+      return;
+    }
+
+    const manifest = buildManifest(scrape);
+    downloadBlob(JSON.stringify(manifest, null, 2), `${sanitizeDownloadName(scrape.slug || 'scrape')}-manifest.json`, 'application/json;charset=utf-8');
+    log(`Downloaded manifest for ${scrape.slug}.`, 'success');
   });
 
   clearBtn.addEventListener('click', () => {
     consoleEl.innerHTML = '<div class="empty-console" id="emptyMsg">// Console output will appear here</div>';
     logLines = 0;
     lineCount.textContent = '0 lines';
-    setProgress(0, 0);
-    if (!running) startBtn.disabled = false;
   });
 
   resetStatsBtn.addEventListener('click', () => {
-    visitStats.real = 0;
-    saveStats();
-    renderStats();
-    resetGlobalCounter();
-    log('Local real baseline reset to 0.', 'warn');
-  });
-
-  realInput.addEventListener('change', () => {
-    const v = Math.max(0, parseInt(realInput.value, 10) || 0);
-    visitStats.real = v;
-    saveStats();
-    renderStats();
-    log(`Real visits baseline set to ${v}.`, 'num');
+    if (!state.activeSlug) {
+      log('No active scrape to delete.', 'warn');
+      return;
+    }
+    delete state.scrapes[state.activeSlug];
+    saveScrapes();
+    state.activeSlug = null;
+    state.activeFilePath = null;
+    history.pushState({}, '', '/');
+    setProgress(0, 0);
+    renderSiteSelect();
+    renderCounters();
+    renderFileManager();
+    log('Active scrape deleted.', 'warn');
   });
 
   counterKeyInput.addEventListener('change', () => {
-    const cleaned = (counterKeyInput.value || '').trim();
-    visitStats.counterKey = cleaned || 'sitjd-vercel-app';
-    saveStats();
-    renderStats();
-    log(`Global counter key set to "${safeCounterKey()}".`, 'num');
-    syncGlobalCounter();
+    currentStorageKey = safeStorageKey();
+    state.scrapes = loadScrapes(currentStorageKey);
+    savePrefs();
+    log(`Storage key changed to "${currentStorageKey}".`, 'num');
+    applyRoute();
   });
 
-  verifyEndpointInput.addEventListener('change', () => {
-    const value = (verifyEndpointInput.value || '').trim();
-    visitStats.verifyEndpoint = value;
-    saveStats();
-    renderStats();
-    if (value) {
-      log('Site verify webhook saved.', 'num');
-    } else {
-      log('Site verify webhook cleared.', 'warn');
+  searchInput.addEventListener('input', () => {
+    state.searchTerm = searchInput.value.trim().toLowerCase();
+    renderFileManager();
+    savePrefs();
+  });
+
+  clearSearchBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    state.searchTerm = '';
+    renderFileManager();
+    savePrefs();
+  });
+
+  [depthInput, sameOriginAssetsInput, typeHtmlInput, typeCssInput, typeJsInput].forEach((input) => {
+    input.addEventListener('change', () => {
+      savePrefs();
+      renderFileManager();
+    });
+  });
+
+  siteSelectEl.addEventListener('change', () => {
+    const slug = siteSelectEl.value;
+    if (!slug || !state.scrapes[slug]) {
+      state.activeSlug = null;
+      state.activeFilePath = null;
+      resetSelections();
+      history.pushState({}, '', '/');
+      renderSiteSelect();
+      renderCounters();
+      renderFileManager();
+      return;
     }
+
+    state.activeSlug = slug;
+    const files = filesForActive();
+    state.activeFilePath = files[0] ? files[0].path : null;
+    resetSelections();
+    history.pushState({}, '', state.activeFilePath ? makeRoute(slug, state.activeFilePath) : `/${encodeURIComponent(slug)}`);
+    renderSiteSelect();
+    renderCounters();
+    renderFileManager();
   });
 
-  /* clamp inputs live */
+  realInput.addEventListener('change', savePrefs);
+  verifyEndpointInput.addEventListener('change', savePrefs);
+
   countInput.addEventListener('change', () => {
     let v = parseInt(countInput.value, 10);
-    if (v < 5)   countInput.value = 5;
-    if (v > 100) countInput.value = 100;
+    if (v < 1) countInput.value = '1';
+    if (v > 25) countInput.value = '25';
   });
 
-  loadStats();
-  renderStats();
-  syncGlobalCounter();
+  delayInput.addEventListener('change', () => {
+    let v = parseInt(delayInput.value, 10);
+    if (v < 1) delayInput.value = '1';
+    if (v > 250) delayInput.value = '250';
+  });
+
+  window.addEventListener('popstate', applyRoute);
+
+  loadPrefs();
+  currentStorageKey = safeStorageKey();
+  state.scrapes = loadScrapes(currentStorageKey);
+  log('ChroniumX initialized in scraper mode.', 'dim');
+  renderSiteSelect();
+  applyRoute();
 </script>
 </body>
 </html>
