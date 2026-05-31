@@ -75,6 +75,43 @@
       max-width: 760px;
     }
 
+    .app-tabs {
+      width: 100%;
+      max-width: 760px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .app-tab-btn {
+      flex: 1;
+      font-family: var(--font);
+      font-size: .72rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      background: #111;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .app-tab-btn.active {
+      background: #1b1b1b;
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .app-page {
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .app-page[hidden] {
+      display: none !important;
+    }
+
     .panel-title {
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
@@ -107,6 +144,95 @@
       flex-direction: column;
       gap: 7px;
     }
+
+    .section-title {
+      font-size: .64rem;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .advanced-box {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      background: #121212;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .advanced-box summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: .7rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .advanced-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .wizard-head {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+      background: #121212;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wizard-steps {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .wizard-chip {
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 4px 8px;
+      font-size: .6rem;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      background: #111;
+    }
+
+    .wizard-chip.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: #1a1a1a;
+    }
+
+    .wizard-info {
+      font-size: .62rem;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .wizard-step[hidden] {
+      display: none !important;
+    }
+
+    .wizard-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .wizard-nav .btn-row {
+      margin-left: auto;
+    }
     label {
       font-size: .68rem;
       letter-spacing: .1em;
@@ -115,7 +241,8 @@
     }
     input[type="url"],
     input[type="number"],
-    input[type="text"] {
+    input[type="text"],
+    select {
       background: #0d0d0d;
       border: 1px solid var(--border);
       color: var(--text);
@@ -129,10 +256,31 @@
     }
     input[type="url"]:focus,
     input[type="number"]:focus,
-    input[type="text"]:focus {
+    input[type="text"]:focus,
+    select:focus {
       border-color: var(--border2);
     }
     input::placeholder { color: var(--muted); }
+
+    .filter-toggle-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 7px 10px;
+      background: #0f0f0f;
+      color: var(--text);
+      letter-spacing: .05em;
+      text-transform: none;
+      font-size: .72rem;
+    }
 
     .row {
       display: flex;
@@ -448,17 +596,42 @@
     <p style="font-size:.6rem;color:var(--muted);margin-top:3px;letter-spacing:.06em;">ChroniumX</p>
   </header>
 
+  <div class="app-tabs" role="tablist" aria-label="Main pages">
+    <button class="app-tab-btn active" id="tabSettings" data-page="settings" type="button">Settings</button>
+    <button class="app-tab-btn" id="tabFiles" data-page="files" type="button">File Manager</button>
+    <button class="app-tab-btn" id="tabConsole" data-page="console" type="button">Console</button>
+  </div>
+
   <!-- Config panel -->
+  <section class="app-page" id="pageSettings">
   <div class="panel">
     <div class="panel-title">Configuration</div>
     <div class="form-body">
 
-      <div class="field">
+      <div class="wizard-head">
+        <div class="wizard-steps">
+          <span class="wizard-chip active" data-step="1">Step 1: Target</span>
+          <span class="wizard-chip" data-step="2">Step 2: Crawl</span>
+          <span class="wizard-chip" data-step="3">Step 3: Filters</span>
+          <span class="wizard-chip" data-step="4">Step 4: Review + Run</span>
+        </div>
+        <div class="wizard-info" id="wizardInfo">Step 1 of 4 - Target Website</div>
+      </div>
+
+      <div class="section-title">Quick Settings</div>
+
+      <div class="field wizard-step step-1">
         <label>Target URL</label>
         <input type="url" id="urlInput" placeholder="https://example.com" />
       </div>
 
-      <div class="row">
+      <div class="field wizard-step step-1">
+        <label>Custom Slug (Optional)</label>
+        <input type="text" id="realInput" value="" placeholder="example-com" />
+        <div class="hint">Override the generated scraped site shortname</div>
+      </div>
+
+      <div class="row wizard-step step-2">
         <div class="field">
           <label>Max Pages</label>
           <input type="number" id="countInput" min="1" max="25" value="8" />
@@ -471,7 +644,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row wizard-step step-2">
         <div class="field">
           <label>Max Depth</label>
           <input type="number" id="depthInput" min="1" max="10" value="3" />
@@ -486,7 +659,7 @@
         </div>
       </div>
 
-      <div class="field">
+      <div class="field wizard-step step-3">
         <label>File Types</label>
         <div class="filter-toggle-row">
           <label class="filter-toggle"><input type="checkbox" id="typeHtmlInput" checked /> HTML</label>
@@ -496,13 +669,30 @@
         <div class="hint">Controls which scraped files appear in the manager and exports</div>
       </div>
 
-      <div class="field">
-        <label>Custom Slug (Optional)</label>
-        <input type="text" id="realInput" value="" placeholder="example-com" />
-        <div class="hint">Override the generated scraped site shortname</div>
+      <details class="advanced-box wizard-step step-3" id="advancedSettings">
+        <summary>Advanced Settings</summary>
+        <div class="advanced-grid">
+          <div class="field">
+            <label>Local Storage Key</label>
+            <input type="text" id="counterKeyInput" value="sourcevault.scrapes.v1" />
+            <div class="hint">Change this to use a different saved scrape namespace</div>
+          </div>
+
+          <div class="field">
+            <label>Preferred Start File (Optional)</label>
+            <input type="text" id="verifyEndpointInput" placeholder="index.html" />
+            <div class="hint">If this file exists in scraped output, it opens first</div>
+          </div>
+        </div>
+      </details>
+
+      <div class="field wizard-step step-4">
+        <label>Saved Scrape</label>
+        <select id="siteSelect"></select>
+        <div class="hint">Switch active scraped site</div>
       </div>
 
-      <div class="counter-grid">
+      <div class="counter-grid wizard-step step-4">
         <div class="counter-card">
           <div class="counter-label">Pages Crawled</div>
           <div class="counter-value" id="realCount">0</div>
@@ -517,30 +707,12 @@
         </div>
       </div>
 
-      <div class="field">
-        <label>Local Storage Key</label>
-        <input type="text" id="counterKeyInput" value="sourcevault.scrapes.v1" />
-        <div class="hint">Change this to use a different saved scrape namespace</div>
-      </div>
-
-      <div class="field">
-        <label>Preferred Start File (Optional)</label>
-        <input type="text" id="verifyEndpointInput" placeholder="index.html" />
-        <div class="hint">If this file exists in scraped output, it opens first</div>
-      </div>
-
-      <div class="field">
-        <label>Saved Scrape</label>
-        <select id="siteSelect"></select>
-        <div class="hint">Switch active scraped site</div>
-      </div>
-
-      <div class="notice">
+      <div class="notice wizard-step step-4">
         This app scrapes source files only. No bot traffic or test hits are sent.
       </div>
 
       <!-- Status bar -->
-      <div class="status-wrap">
+      <div class="status-wrap wizard-step step-4">
         <div class="status-label">
           Progress &nbsp;<span id="statusText">0 / 0</span>
         </div>
@@ -549,7 +721,15 @@
         </div>
       </div>
 
-      <div class="btn-row">
+      <div class="wizard-nav">
+        <span class="wizard-info" id="wizardStepLabel">Use Next to continue</span>
+        <div class="btn-row" style="margin:0;">
+          <button id="wizardBackBtn" type="button">Back</button>
+          <button id="wizardNextBtn" type="button">Next</button>
+        </div>
+      </div>
+
+      <div class="btn-row wizard-step step-4">
         <button id="startBtn">&#9654;&nbsp; Scrape</button>
         <button id="clearBtn">Clear Console</button>
         <button id="resetStatsBtn">Delete Active Scrape</button>
@@ -557,7 +737,9 @@
 
     </div>
   </div>
+  </section>
 
+  <section class="app-page" id="pageFiles" hidden>
   <div class="panel console-panel">
     <div class="panel-title">
       <span>File Manager</span>
@@ -583,8 +765,10 @@
       </div>
     </div>
   </div>
+  </section>
 
   <!-- Console panel -->
+  <section class="app-page" id="pageConsole" hidden>
   <div class="panel console-panel">
     <div class="panel-title">
       <span>Output Console</span>
@@ -594,6 +778,7 @@
       <div class="empty-console" id="emptyMsg">// Console output will appear here</div>
     </div>
   </div>
+  </section>
 
   <footer>CHRONIUMX &copy; 2026</footer>
 
@@ -611,6 +796,16 @@
   const counterKeyInput = document.getElementById('counterKeyInput');
   const verifyEndpointInput = document.getElementById('verifyEndpointInput');
   const siteSelectEl = document.getElementById('siteSelect');
+  const tabSettings = document.getElementById('tabSettings');
+  const tabFiles = document.getElementById('tabFiles');
+  const tabConsole = document.getElementById('tabConsole');
+  const pageSettings = document.getElementById('pageSettings');
+  const pageFiles = document.getElementById('pageFiles');
+  const pageConsole = document.getElementById('pageConsole');
+  const wizardInfo = document.getElementById('wizardInfo');
+  const wizardStepLabel = document.getElementById('wizardStepLabel');
+  const wizardBackBtn = document.getElementById('wizardBackBtn');
+  const wizardNextBtn = document.getElementById('wizardNextBtn');
   const startBtn = document.getElementById('startBtn');
   const clearBtn = document.getElementById('clearBtn');
   const resetStatsBtn = document.getElementById('resetStatsBtn');
@@ -638,6 +833,7 @@
   let logLines = 0;
   const PREFS_KEY = 'chroniumx.scraperPrefs.v1';
   let currentStorageKey = 'sourcevault.scrapes.v1';
+  let wizardStep = 1;
   let state = {
     scrapes: {},
     activeSlug: null,
@@ -657,6 +853,65 @@
     num: '[STAT]',
     url: '[URL] ',
   };
+
+  function switchPage(pageName) {
+    const showSettings = pageName === 'settings';
+    const showFiles = pageName === 'files';
+    const showConsole = pageName === 'console';
+
+    pageSettings.hidden = !showSettings;
+    pageFiles.hidden = !showFiles;
+    pageConsole.hidden = !showConsole;
+
+    tabSettings.classList.toggle('active', showSettings);
+    tabFiles.classList.toggle('active', showFiles);
+    tabConsole.classList.toggle('active', showConsole);
+  }
+
+  function setWizardStep(step) {
+    wizardStep = Math.max(1, Math.min(4, step));
+
+    const stepTitles = {
+      1: 'Step 1 of 4 - Target Website',
+      2: 'Step 2 of 4 - Crawl Limits',
+      3: 'Step 3 of 4 - File Filters',
+      4: 'Step 4 of 4 - Review and Scrape',
+    };
+
+    wizardInfo.textContent = stepTitles[wizardStep] || stepTitles[1];
+    wizardStepLabel.textContent = wizardStep < 4 ? 'Use Next to continue' : 'Ready to scrape';
+
+    document.querySelectorAll('.wizard-chip').forEach((chip) => {
+      const chipStep = Number(chip.getAttribute('data-step'));
+      chip.classList.toggle('active', chipStep === wizardStep);
+    });
+
+    document.querySelectorAll('.wizard-step').forEach((section) => {
+      section.hidden = !section.classList.contains(`step-${wizardStep}`);
+    });
+
+    wizardBackBtn.disabled = wizardStep === 1;
+    wizardNextBtn.hidden = wizardStep === 4;
+  }
+
+  function validateWizardStep(step) {
+    if (step === 1) {
+      const url = (urlInput.value || '').trim();
+      if (!url) {
+        log('Please enter a target URL first.', 'warn');
+        urlInput.focus();
+        return false;
+      }
+      try {
+        new URL(url);
+      } catch {
+        log('Please enter a valid URL before continuing.', 'warn');
+        urlInput.focus();
+        return false;
+      }
+    }
+    return true;
+  }
 
   function timestamp() {
     const n = new Date();
@@ -1158,6 +1413,7 @@
       state.activeSlug = null;
       state.activeFilePath = null;
       resetSelections();
+      switchPage('settings');
       renderSiteSelect();
       renderCounters();
       renderFileManager();
@@ -1172,6 +1428,7 @@
       state.activeFilePath = files[0] ? files[0].path : null;
     }
 
+    switchPage('files');
     renderSiteSelect();
     renderCounters();
     renderFileManager();
@@ -1229,6 +1486,7 @@
     renderSiteSelect();
     renderCounters();
     renderFileManager();
+    switchPage('files');
 
     log(`Scrape complete. Saved ${fileTotal} files to slug "${finalSlug}".`, 'success');
     if (state.scrapes[finalSlug].warnings.length > 0) {
@@ -1435,6 +1693,19 @@
     if (!running) runScrape();
   });
 
+  wizardBackBtn.addEventListener('click', () => {
+    setWizardStep(wizardStep - 1);
+  });
+
+  wizardNextBtn.addEventListener('click', () => {
+    if (!validateWizardStep(wizardStep)) return;
+    setWizardStep(wizardStep + 1);
+  });
+
+  tabSettings.addEventListener('click', () => switchPage('settings'));
+  tabFiles.addEventListener('click', () => switchPage('files'));
+  tabConsole.addEventListener('click', () => switchPage('console'));
+
   downloadCurrentBtn.addEventListener('click', downloadCurrentFile);
   downloadAllBtn.addEventListener('click', () => {
     downloadAllFiles().catch((error) => {
@@ -1580,6 +1851,8 @@
   currentStorageKey = safeStorageKey();
   state.scrapes = loadScrapes(currentStorageKey);
   log('ChroniumX initialized in scraper mode.', 'dim');
+  switchPage('settings');
+  setWizardStep(1);
   renderSiteSelect();
   applyRoute();
 </script>
