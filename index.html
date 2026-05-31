@@ -111,10 +111,57 @@
     .app-page {
       width: 100%;
       max-width: 760px;
+      position: relative;
     }
 
     .app-page[hidden] {
       display: none !important;
+    }
+
+    .page-loader {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 13, 13, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      z-index: 12;
+      pointer-events: all;
+    }
+
+    .page-loader.open {
+      display: flex;
+    }
+
+    .page-loader-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      background: #111;
+      color: var(--text);
+      font-size: .7rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .page-loader-spin {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .panel-title {
@@ -864,6 +911,12 @@
 
   <!-- Config panel -->
   <section class="app-page" id="pageSettings">
+  <div class="page-loader" aria-live="polite" aria-busy="true">
+    <div class="page-loader-card">
+      <span class="page-loader-spin" aria-hidden="true"></span>
+      <span>Loading Settings...</span>
+    </div>
+  </div>
   <div class="panel">
     <div class="panel-title">Configuration</div>
     <div class="form-body">
@@ -1000,6 +1053,12 @@
   </section>
 
   <section class="app-page" id="pageFiles" hidden>
+  <div class="page-loader" aria-live="polite" aria-busy="true">
+    <div class="page-loader-card">
+      <span class="page-loader-spin" aria-hidden="true"></span>
+      <span>Loading File Manager...</span>
+    </div>
+  </div>
   <div class="panel console-panel">
     <div class="panel-title">
       <span>File Manager</span>
@@ -1030,6 +1089,12 @@
   </section>
 
   <section class="app-page" id="pageUpdates" hidden>
+  <div class="page-loader" aria-live="polite" aria-busy="true">
+    <div class="page-loader-card">
+      <span class="page-loader-spin" aria-hidden="true"></span>
+      <span>Loading Updates...</span>
+    </div>
+  </div>
   <div class="panel console-panel">
     <div class="panel-title">Updates</div>
     <div class="updates-wrap">
@@ -1047,6 +1112,12 @@
 
   <!-- Console panel -->
   <section class="app-page" id="pageConsole" hidden>
+  <div class="page-loader" aria-live="polite" aria-busy="true">
+    <div class="page-loader-card">
+      <span class="page-loader-spin" aria-hidden="true"></span>
+      <span>Loading Console...</span>
+    </div>
+  </div>
   <div class="panel console-panel">
     <div class="panel-title">
       <span>Output Console</span>
@@ -1136,6 +1207,8 @@
     liveProgress: null,
     searchTerm: '',
   };
+  let pageLoadTimer = null;
+  let pageLoadToken = 0;
 
   const tagMap = {
     info: '[INFO]',
@@ -1148,7 +1221,22 @@
     url: '[URL] ',
   };
 
-  function switchPage(pageName) {
+  function hideAllPageLoaders() {
+    document.querySelectorAll('.page-loader').forEach((loader) => {
+      loader.classList.remove('open');
+    });
+  }
+
+  function pageElementForName(pageName) {
+    if (pageName === 'settings') return pageSettings;
+    if (pageName === 'files') return pageFiles;
+    if (pageName === 'console') return pageConsole;
+    if (pageName === 'updates') return pageUpdates;
+    return null;
+  }
+
+  function switchPage(pageName, options = {}) {
+    const { withLoader = true } = options;
     const showSettings = pageName === 'settings';
     const showFiles = pageName === 'files';
     const showConsole = pageName === 'console';
@@ -1163,6 +1251,34 @@
     tabFiles.classList.toggle('active', showFiles);
     tabConsole.classList.toggle('active', showConsole);
     tabUpdates.classList.toggle('active', showUpdates);
+
+    if (pageLoadTimer) {
+      clearTimeout(pageLoadTimer);
+      pageLoadTimer = null;
+    }
+
+    hideAllPageLoaders();
+    if (!withLoader) {
+      return;
+    }
+
+    const page = pageElementForName(pageName);
+    if (!page) {
+      return;
+    }
+
+    const loader = page.querySelector('.page-loader');
+    if (!loader) {
+      return;
+    }
+
+    const token = ++pageLoadToken;
+    loader.classList.add('open');
+    pageLoadTimer = setTimeout(() => {
+      if (token !== pageLoadToken) return;
+      loader.classList.remove('open');
+      pageLoadTimer = null;
+    }, 320);
   }
 
   function showConfirmDialog({ title, message, confirmText = 'Yes', cancelText = 'No', confirmTone = 'default' }) {
@@ -2280,7 +2396,7 @@
   state.scrapes = loadScrapes(currentStorageKey);
   updatesVersion.textContent = `Version: ${APP_VERSION}`;
   log('ChroniumX initialized in scraper mode.', 'dim');
-  switchPage('settings');
+  switchPage('settings', { withLoader: false });
   setWizardStep(1);
   renderSiteSelect();
   handleRefreshRestoreFlow().then(() => {
